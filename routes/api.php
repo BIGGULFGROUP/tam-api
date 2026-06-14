@@ -14,18 +14,29 @@ use App\Http\Controllers\Api\Admin\NewsletterPopupController;
 use App\Http\Controllers\Api\Admin\ContentSubmissionController;
 use App\Http\Controllers\Api\Admin\SiteSettingController;
 use App\Http\Controllers\Api\Admin\AnalyticsController;
+use App\Http\Controllers\Api\Admin\AccountController;
 use App\Http\Controllers\Api\Admin\ActivityLogController;
 use App\Http\Controllers\Api\Admin\YoutubeController;
 use App\Http\Controllers\Api\PublicSiteController;
 
 Route::prefix('public')->group(function () {
+    Route::get('categories', [PublicSiteController::class, 'categories']);
+    Route::get('content', [PublicSiteController::class, 'content']);
     Route::get('content/latest', [PublicSiteController::class, 'latestContent']);
     Route::get('content/nav-menu', [PublicSiteController::class, 'navMenu']);
     Route::get('content/shorts', [PublicSiteController::class, 'shorts']);
+    Route::get('search/suggestions', [PublicSiteController::class, 'searchSuggestions']);
+    Route::get('tags', [PublicSiteController::class, 'tags']);
+    Route::get('tags/{slug}', [PublicSiteController::class, 'tagBySlug']);
+    Route::get('tags/{slug}/related', [PublicSiteController::class, 'relatedTags']);
+    Route::get('authors/slug/{slug}', [PublicSiteController::class, 'authorBySlug']);
+    Route::get('authors/name/{name}', [PublicSiteController::class, 'authorByName']);
+    Route::get('authors/{id}', [PublicSiteController::class, 'authorById']);
     Route::post('content/view', [PublicSiteController::class, 'recordView']);
     Route::get('site/settings', [PublicSiteController::class, 'siteSettings']);
     Route::get('comments', [PublicSiteController::class, 'comments']);
     Route::post('comments', [PublicSiteController::class, 'submitComment']);
+    Route::get('newsletters', [PublicSiteController::class, 'newsletters']);
     Route::post('newsletter', [PublicSiteController::class, 'subscribeNewsletter']);
     Route::get('newsletter/popup-config', [PublicSiteController::class, 'popupConfig']);
     Route::post('newsletter/popup-event', [PublicSiteController::class, 'popupEvent']);
@@ -98,6 +109,16 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
 
             Route::get('analytics/my-content', [AnalyticsController::class, 'myContent']);
             Route::get('youtube/preview', [YoutubeController::class, 'preview']);
+
+            Route::prefix('account')->group(function () {
+                Route::get('notifications', [AccountController::class, 'notifications']);
+                Route::post('notifications/read', [AccountController::class, 'markNotificationsRead']);
+                Route::post('activity/read', [AccountController::class, 'recordActivityRead']);
+                Route::get('readership/weekly', [AccountController::class, 'weeklyReadership']);
+                Route::match(['get', 'put'], 'preferences/notifications', [AccountController::class, 'notificationPreferences']);
+                Route::match(['get', 'put'], 'preferences/newsletter', [AccountController::class, 'newsletterPreferences']);
+                Route::post('profile/avatar', [AccountController::class, 'updateAvatar']);
+            });
         });
     });
 });
