@@ -1,0 +1,12 @@
+.env
+.env.local
+.env.production
+.env.backup
+.git
+node_modules
+vendor
+database/database.sqlite
+public/build
+storage/logs
+npm-debug.log
+yarn-error.log
