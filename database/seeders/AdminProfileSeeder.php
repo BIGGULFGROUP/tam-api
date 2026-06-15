@@ -12,10 +12,9 @@ class AdminProfileSeeder extends Seeder
     {
         // Creates a default super admin for local development.
         // Change credentials immediately after first login.
-        AdminProfile::firstOrCreate(
+        AdminProfile::updateOrCreate(
             ['email' => 'admin@theafricanmail.com'],
             [
-                'id'           => Str::uuid(),
                 'password'     => bcrypt('Admin@1234'),
                 'display_name' => 'Super Admin',
                 'full_name'    => 'Super Admin',
@@ -27,10 +26,9 @@ class AdminProfileSeeder extends Seeder
         );
 
         // Seed a specific admin account requested by the developer.
-        AdminProfile::firstOrCreate(
+        AdminProfile::updateOrCreate(
             ['email' => 'ahmaduabubakarr@gmail.com'],
             [
-                'id'           => Str::uuid(),
                 // Default password: change immediately after first login
                 'password'     => bcrypt('Admin@1234'),
                 'display_name' => 'Ahmadu Abubakarr',
