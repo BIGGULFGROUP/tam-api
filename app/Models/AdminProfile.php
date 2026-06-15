@@ -15,6 +15,10 @@ class AdminProfile extends Authenticatable
 {
     use HasApiTokens, HasUuids, Notifiable;
 
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
     protected $table = 'admin_profiles';
 
     protected $fillable = [
