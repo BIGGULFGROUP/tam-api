@@ -36,7 +36,12 @@ return new class extends Migration
 
         Schema::table('videos', function (Blueprint $table) {
             if (! Schema::hasColumn('videos', 'collaborator_ids')) {
-                $table->jsonb('collaborator_ids')->nullable()->after('created_by');
+                $driver = DB::connection()->getDriverName();
+                if ($driver === 'pgsql') {
+                    $table->jsonb('collaborator_ids')->nullable()->after('created_by');
+                } else {
+                    $table->json('collaborator_ids')->nullable()->after('created_by');
+                }
             }
             if (! Schema::hasColumn('videos', 'source_channel_id')) {
                 $table->string('source_channel_id')->nullable()->after('youtube_id');
@@ -48,25 +53,51 @@ return new class extends Migration
                 $table->string('source_channel_slug')->nullable()->after('source_channel_name');
             }
             if (! Schema::hasColumn('videos', 'key_takeaways')) {
-                $table->jsonb('key_takeaways')->nullable()->after('body');
+                $driver = DB::connection()->getDriverName();
+                if ($driver === 'pgsql') {
+                    $table->jsonb('key_takeaways')->nullable()->after('body');
+                } else {
+                    $table->json('key_takeaways')->nullable()->after('body');
+                }
             }
         });
 
-        DB::table('videos')
-            ->whereNull('collaborator_ids')
-            ->update(['collaborator_ids' => DB::raw("'[]'::jsonb")]);
+        $driver = DB::connection()->getDriverName();
+        
+        if ($driver === 'pgsql') {
+            DB::table('videos')
+                ->whereNull('collaborator_ids')
+                ->update(['collaborator_ids' => DB::raw("'[]'::jsonb")]);
 
-        DB::table('videos')
-            ->whereNull('source_channel_name')
-            ->whereNotNull('author')
-            ->update(['source_channel_name' => DB::raw('author')]);
+            DB::table('videos')
+                ->whereNull('source_channel_name')
+                ->whereNotNull('author')
+                ->update(['source_channel_name' => DB::raw('author')]);
 
-        DB::table('videos')
-            ->whereNull('source_channel_slug')
-            ->whereNotNull('source_channel_name')
-            ->update([
-                'source_channel_slug' => DB::raw("NULLIF(regexp_replace(lower(source_channel_name), '[^a-z0-9]+', '-', 'g'), '')"),
-            ]);
+            DB::table('videos')
+                ->whereNull('source_channel_slug')
+                ->whereNotNull('source_channel_name')
+                ->update([
+                    'source_channel_slug' => DB::raw("NULLIF(regexp_replace(lower(source_channel_name), '[^a-z0-9]+', '-', 'g'), '')"),
+                ]);
+        } else {
+            // MySQL
+            DB::table('videos')
+                ->whereNull('collaborator_ids')
+                ->update(['collaborator_ids' => DB::raw("JSON_ARRAY()")]);
+
+            DB::table('videos')
+                ->whereNull('source_channel_name')
+                ->whereNotNull('author')
+                ->update(['source_channel_name' => DB::raw('author')]);
+
+            DB::table('videos')
+                ->whereNull('source_channel_slug')
+                ->whereNotNull('source_channel_name')
+                ->update([
+                    'source_channel_slug' => DB::raw("TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(source_channel_name), '[^a-z0-9]+', '-'))"),
+                ]);
+        }
 
         DB::table('videos')
             ->whereNotNull('created_by')
@@ -158,13 +189,25 @@ return new class extends Migration
                 $table->timestamp('confirmed_at')->nullable()->after('source');
             }
             if (! Schema::hasColumn('newsletter_subscribers', 'subscription_context')) {
-                $table->jsonb('subscription_context')->nullable()->after('popup_type');
+                $driver = DB::connection()->getDriverName();
+                if ($driver === 'pgsql') {
+                    $table->jsonb('subscription_context')->nullable()->after('popup_type');
+                } else {
+                    $table->json('subscription_context')->nullable()->after('popup_type');
+                }
             }
         });
 
-        DB::table('newsletter_subscribers')
-            ->whereNull('subscription_context')
-            ->update(['subscription_context' => DB::raw("'{}'::jsonb")]);
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
+            DB::table('newsletter_subscribers')
+                ->whereNull('subscription_context')
+                ->update(['subscription_context' => DB::raw("'{}'::jsonb")]);
+        } else {
+            DB::table('newsletter_subscribers')
+                ->whereNull('subscription_context')
+                ->update(['subscription_context' => DB::raw("JSON_OBJECT()")]);
+        }
 
         Schema::table('newsletter_campaigns', function (Blueprint $table) {
             if (! Schema::hasColumn('newsletter_campaigns', 'created_by')) {
@@ -213,13 +256,23 @@ return new class extends Migration
             ->update(['permalink_structure' => 'plain']);
 
         if (! $this->hasConstraint('site_settings_permalink_structure_check')) {
-            DB::statement(
-                "ALTER TABLE site_settings ADD CONSTRAINT site_settings_permalink_structure_check " .
-                "CHECK (permalink_structure IN ('plain', 'type-slug', 'type-date-slug'))"
-            );
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement(
+                    "ALTER TABLE site_settings ADD CONSTRAINT site_settings_permalink_structure_check " .
+                    "CHECK (permalink_structure IN ('plain', 'type-slug', 'type-date-slug'))"
+                );
+            } else {
+                // MySQL 8.0+
+                DB::statement(
+                    "ALTER TABLE site_settings ADD CONSTRAINT site_settings_permalink_structure_check " .
+                    "CHECK (permalink_structure IN ('plain', 'type-slug', 'type-date-slug'))"
+                );
+            }
         }
 
         if (! $this->hasConstraint('site_settings_newsletter_popup_interval_hours_check')) {
+            $driver = DB::connection()->getDriverName();
             DB::statement(
                 "ALTER TABLE site_settings ADD CONSTRAINT site_settings_newsletter_popup_interval_hours_check " .
                 "CHECK (newsletter_popup_interval_hours BETWEEN 1 AND 168)"
@@ -227,6 +280,7 @@ return new class extends Migration
         }
 
         if (! $this->hasConstraint('site_settings_shorts_autofetch_interval_hours_check')) {
+            $driver = DB::connection()->getDriverName();
             DB::statement(
                 "ALTER TABLE site_settings ADD CONSTRAINT site_settings_shorts_autofetch_interval_hours_check " .
                 "CHECK (shorts_autofetch_interval_hours BETWEEN 1 AND 168)"
@@ -234,13 +288,19 @@ return new class extends Migration
         }
 
         if (! $this->hasConstraint('site_settings_max_shorts_per_channel_check')) {
+            $driver = DB::connection()->getDriverName();
             DB::statement(
                 "ALTER TABLE site_settings ADD CONSTRAINT site_settings_max_shorts_per_channel_check " .
                 "CHECK (max_shorts_per_channel BETWEEN 1 AND 50)"
             );
         }
 
-        DB::statement('ALTER TABLE content_submissions ALTER COLUMN content_id DROP NOT NULL');
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
+            DB::statement('ALTER TABLE content_submissions ALTER COLUMN content_id DROP NOT NULL');
+        } else {
+            DB::statement('ALTER TABLE content_submissions MODIFY COLUMN content_id CHAR(36) NULL');
+        }
 
         DB::table('content_submissions')
             ->whereNotNull('content_id')
@@ -469,15 +529,38 @@ return new class extends Migration
 
     private function hasConstraint(string $constraintName): bool
     {
-        return DB::table('pg_constraint')->where('conname', $constraintName)->exists();
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return DB::table('pg_constraint')->where('conname', $constraintName)->exists();
+        }
+
+        // MySQL / MariaDB
+        return DB::select(
+            "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME = ?",
+            [$constraintName]
+        ) !== [] || DB::select(
+            "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE CONSTRAINT_NAME = ?",
+            [$constraintName]
+        ) !== [];
     }
 
     private function hasIndex(string $tableName, string $indexName): bool
     {
-        return DB::table('pg_indexes')
-            ->where('tablename', $tableName)
-            ->where('indexname', $indexName)
-            ->exists();
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return DB::table('pg_indexes')
+                ->where('tablename', $tableName)
+                ->where('indexname', $indexName)
+                ->exists();
+        }
+
+        // MySQL / MariaDB
+        return DB::select(
+            "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = ? AND INDEX_NAME = ? AND TABLE_SCHEMA = ?",
+            [$tableName, $indexName, DB::getDatabaseName()]
+        ) !== [];
     }
 
     private function dropConstraintIfExists(string $constraintName): void

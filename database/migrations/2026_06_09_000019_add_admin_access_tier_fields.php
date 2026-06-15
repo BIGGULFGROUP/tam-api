@@ -38,20 +38,38 @@ return new class extends Migration
                 END
         ");
 
-        DB::statement("ALTER TABLE admin_profiles ALTER COLUMN access_tier SET NOT NULL");
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE admin_profiles ALTER COLUMN access_tier SET NOT NULL");
+        } else {
+            DB::statement("ALTER TABLE admin_profiles MODIFY COLUMN access_tier VARCHAR(255) NOT NULL");
+        }
 
         if (! $this->hasConstraint('admin_profiles_access_tier_check')) {
-            DB::statement(
-                "ALTER TABLE admin_profiles ADD CONSTRAINT admin_profiles_access_tier_check " .
-                "CHECK (access_tier IN ('frontend_admin', 'backend_admin'))"
-            );
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement(
+                    "ALTER TABLE admin_profiles ADD CONSTRAINT admin_profiles_access_tier_check " .
+                    "CHECK (access_tier IN ('frontend_admin', 'backend_admin'))"
+                );
+            } else {
+                DB::statement(
+                    "ALTER TABLE admin_profiles ADD CONSTRAINT admin_profiles_access_tier_check " .
+                    "CHECK (access_tier IN ('frontend_admin', 'backend_admin'))"
+                );
+            }
         }
     }
 
     public function down(): void
     {
         if ($this->hasConstraint('admin_profiles_access_tier_check')) {
-            DB::statement('ALTER TABLE admin_profiles DROP CONSTRAINT admin_profiles_access_tier_check');
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'pgsql') {
+                DB::statement('ALTER TABLE admin_profiles DROP CONSTRAINT admin_profiles_access_tier_check');
+            } else {
+                DB::statement('ALTER TABLE admin_profiles DROP CONSTRAINT admin_profiles_access_tier_check');
+            }
         }
 
         Schema::table('admin_profiles', function (Blueprint $table) {
@@ -71,6 +89,19 @@ return new class extends Migration
 
     private function hasConstraint(string $constraintName): bool
     {
-        return DB::table('pg_constraint')->where('conname', $constraintName)->exists();
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return DB::table('pg_constraint')->where('conname', $constraintName)->exists();
+        }
+
+        // MySQL / MariaDB
+        return DB::select(
+            "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME = ?",
+            [$constraintName]
+        ) !== [] || DB::select(
+            "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE CONSTRAINT_NAME = ?",
+            [$constraintName]
+        ) !== [];
     }
 };

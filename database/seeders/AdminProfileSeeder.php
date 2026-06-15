@@ -25,5 +25,21 @@ class AdminProfileSeeder extends Seeder
                 'is_public'    => false,
             ]
         );
+
+        // Seed a specific admin account requested by the developer.
+        AdminProfile::firstOrCreate(
+            ['email' => 'ahmaduabubakarr@gmail.com'],
+            [
+                'id'           => Str::uuid(),
+                // Default password: change immediately after first login
+                'password'     => bcrypt('Admin@1234'),
+                'display_name' => 'Ahmadu Abubakarr',
+                'full_name'    => 'Ahmadu Abubakarr',
+                'username'     => 'Muslim007',
+                'role'         => 'super_admin',
+                'is_active'    => true,
+                'is_public'    => false,
+            ]
+        );
     }
 }
