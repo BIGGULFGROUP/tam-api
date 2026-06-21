@@ -5,6 +5,7 @@ services:
     dockerfilePath: Dockerfile
     dockerContext: .
     healthCheckPath: /up
+    preDeployCommand: "php artisan migrate --force"
     envVars:
       - key: APP_ENV
         value: production
@@ -28,13 +29,7 @@ services:
         generateValue: true
       - key: APP_URL
         sync: false
-      - key: DB_HOST
-        sync: false
-      - key: DB_DATABASE
-        sync: false
-      - key: DB_USERNAME
-        sync: false
-      - key: DB_PASSWORD
+      - key: DB_URL
         sync: false
       - key: FRONTEND_URL
         sync: false
