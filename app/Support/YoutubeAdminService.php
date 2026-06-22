@@ -123,7 +123,7 @@ class YoutubeAdminService
     public function fetchPreviewForCategory(string $categorySlug): array
     {
         $category = Category::query()
-            ->select(['slug', 'youtube_channel_id', 'youtube_playlist_id'])
+            ->select(['id', 'slug', 'youtube_channel_id', 'youtube_playlist_id', 'youtube_channel_username'])
             ->where('slug', $categorySlug)
             ->first();
 
@@ -131,13 +131,28 @@ class YoutubeAdminService
             return ['error' => 'Category not found', 'status' => 404];
         }
 
-        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id) {
+        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && ! $category->youtube_channel_username) {
             return ['error' => 'Category has no YouTube channel configured', 'status' => 400];
         }
 
         $apiKeyStatus = $this->getApiKeyStatus();
         if (! $apiKeyStatus['key']) {
             return ['error' => 'YouTube API key is missing', 'status' => 500];
+        }
+
+        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && $category->youtube_channel_username) {
+            $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
+                'part' => 'id',
+                'forUsername' => $category->youtube_channel_username,
+                'key' => $apiKeyStatus['key'],
+            ]);
+            $channelId = data_get($resolveResponse->json(), 'items.0.id');
+            if ($channelId) {
+                $category->youtube_channel_id = $channelId;
+                $category->save();
+            } else {
+                return ['error' => 'Could not resolve YouTube channel username to an ID', 'status' => 404];
+            }
         }
 
         $response = Http::get(
@@ -285,7 +300,7 @@ class YoutubeAdminService
         string $triggeredBy = 'manual'
     ): array {
         $category = Category::query()
-            ->select(['slug', 'youtube_channel_id', 'youtube_playlist_id'])
+            ->select(['id', 'slug', 'youtube_channel_id', 'youtube_playlist_id', 'youtube_channel_username'])
             ->where('slug', $categorySlug)
             ->first();
 
@@ -293,7 +308,7 @@ class YoutubeAdminService
             return ['error' => 'Category not found', 'status' => 404];
         }
 
-        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id) {
+        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && ! $category->youtube_channel_username) {
             return ['error' => 'Category has no YouTube channel configured', 'status' => 400];
         }
 
@@ -309,6 +324,29 @@ class YoutubeAdminService
             ]);
 
             return ['error' => $message, 'status' => 500];
+        }
+
+        if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && $category->youtube_channel_username) {
+            $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
+                'part' => 'id',
+                'forUsername' => $category->youtube_channel_username,
+                'key' => $apiKeyStatus['key'],
+            ]);
+            $channelId = data_get($resolveResponse->json(), 'items.0.id');
+            if ($channelId) {
+                $category->youtube_channel_id = $channelId;
+                $category->save();
+            } else {
+                $message = 'Could not resolve YouTube channel username to an ID';
+                $this->logFetch([
+                    'category_slug' => $categorySlug,
+                    'status' => 'error',
+                    'error_message' => $message,
+                    'triggered_by' => $triggeredBy,
+                    'triggered_by_admin' => $triggeredByAdmin,
+                ]);
+                return ['error' => $message, 'status' => 404];
+            }
         }
 
         $response = Http::get(
@@ -500,8 +538,6 @@ class YoutubeAdminService
 
     private function getDueCategories(int $intervalHours)
     {
-        $cutoff = now()->subHours($intervalHours);
-
         return Category::query()
             ->where('is_active', true)
             ->where(function ($query) {
@@ -509,12 +545,15 @@ class YoutubeAdminService
             })
             ->where(function ($query) {
                 $query->whereNotNull('youtube_channel_id')->where('youtube_channel_id', '!=', '')
+                    ->orWhereNotNull('youtube_channel_username')->where('youtube_channel_username', '!=', '')
                     ->orWhere(function ($nested) {
                         $nested->whereNotNull('youtube_playlist_id')->where('youtube_playlist_id', '!=', '');
                     });
             })
             ->get()
-            ->filter(function (Category $category) use ($cutoff) {
+            ->filter(function (Category $category) use ($intervalHours) {
+                $hours = $category->fetch_interval_hours ?: $intervalHours;
+                $cutoff = now()->subHours($hours);
                 return ! $category->last_fetched_at || $category->last_fetched_at->lt($cutoff);
             })
             ->values();

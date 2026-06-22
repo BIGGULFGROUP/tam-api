@@ -80,7 +80,7 @@ return new class extends Migration
                 ->update([
                     'source_channel_slug' => DB::raw("NULLIF(regexp_replace(lower(source_channel_name), '[^a-z0-9]+', '-', 'g'), '')"),
                 ]);
-        } else {
+        } elseif ($driver !== 'sqlite') {
             // MySQL
             DB::table('videos')
                 ->whereNull('collaborator_ids')
@@ -262,7 +262,7 @@ return new class extends Migration
                     "ALTER TABLE site_settings ADD CONSTRAINT site_settings_permalink_structure_check " .
                     "CHECK (permalink_structure IN ('plain', 'type-slug', 'type-date-slug'))"
                 );
-            } else {
+            } elseif ($driver !== 'sqlite') {
                 // MySQL 8.0+
                 DB::statement(
                     "ALTER TABLE site_settings ADD CONSTRAINT site_settings_permalink_structure_check " .
@@ -273,32 +273,38 @@ return new class extends Migration
 
         if (! $this->hasConstraint('site_settings_newsletter_popup_interval_hours_check')) {
             $driver = DB::connection()->getDriverName();
-            DB::statement(
-                "ALTER TABLE site_settings ADD CONSTRAINT site_settings_newsletter_popup_interval_hours_check " .
-                "CHECK (newsletter_popup_interval_hours BETWEEN 1 AND 168)"
-            );
+            if ($driver !== 'sqlite') {
+                DB::statement(
+                    "ALTER TABLE site_settings ADD CONSTRAINT site_settings_newsletter_popup_interval_hours_check " .
+                    "CHECK (newsletter_popup_interval_hours BETWEEN 1 AND 168)"
+                );
+            }
         }
 
         if (! $this->hasConstraint('site_settings_shorts_autofetch_interval_hours_check')) {
             $driver = DB::connection()->getDriverName();
-            DB::statement(
-                "ALTER TABLE site_settings ADD CONSTRAINT site_settings_shorts_autofetch_interval_hours_check " .
-                "CHECK (shorts_autofetch_interval_hours BETWEEN 1 AND 168)"
-            );
+            if ($driver !== 'sqlite') {
+                DB::statement(
+                    "ALTER TABLE site_settings ADD CONSTRAINT site_settings_shorts_autofetch_interval_hours_check " .
+                    "CHECK (shorts_autofetch_interval_hours BETWEEN 1 AND 168)"
+                );
+            }
         }
 
         if (! $this->hasConstraint('site_settings_max_shorts_per_channel_check')) {
             $driver = DB::connection()->getDriverName();
-            DB::statement(
-                "ALTER TABLE site_settings ADD CONSTRAINT site_settings_max_shorts_per_channel_check " .
-                "CHECK (max_shorts_per_channel BETWEEN 1 AND 50)"
-            );
+            if ($driver !== 'sqlite') {
+                DB::statement(
+                    "ALTER TABLE site_settings ADD CONSTRAINT site_settings_max_shorts_per_channel_check " .
+                    "CHECK (max_shorts_per_channel BETWEEN 1 AND 50)"
+                );
+            }
         }
 
         $driver = DB::connection()->getDriverName();
         if ($driver === 'pgsql') {
             DB::statement('ALTER TABLE content_submissions ALTER COLUMN content_id DROP NOT NULL');
-        } else {
+        } elseif ($driver !== 'sqlite') {
             DB::statement('ALTER TABLE content_submissions MODIFY COLUMN content_id CHAR(36) NULL');
         }
 
@@ -531,6 +537,10 @@ return new class extends Migration
     {
         $driver = DB::connection()->getDriverName();
 
+        if ($driver === 'sqlite') {
+            return false;
+        }
+
         if ($driver === 'pgsql') {
             return DB::table('pg_constraint')->where('conname', $constraintName)->exists();
         }
@@ -548,6 +558,10 @@ return new class extends Migration
     private function hasIndex(string $tableName, string $indexName): bool
     {
         $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return false;
+        }
 
         if ($driver === 'pgsql') {
             return DB::table('pg_indexes')

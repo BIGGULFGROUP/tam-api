@@ -9,7 +9,7 @@ class Category extends Model
     protected $fillable = [
         'slug', 'label', 'short_label', 'description', 'about',
         'accent_color', 'cover_image_url', 'icon',
-        'youtube_channel_id', 'youtube_channel_name', 'youtube_playlist_id',
+        'youtube_channel_id', 'youtube_channel_username', 'youtube_channel_name', 'youtube_playlist_id',
         'auto_fetch_enabled', 'fetch_interval_hours',
         'seo_title', 'seo_description',
         'featured_publication_slug', 'spotlight_title',
