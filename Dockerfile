@@ -3,12 +3,12 @@ FROM php:8.3-apache
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     PORT=8080
 
-# Configure Apache DocumentRoot to point to Laravel's public directory
-ENV APACHE_DOCUMENT_ROOT /app/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
-    && a2enmod rewrite \
-    && echo "Listen ${PORT}" > /etc/apache2/ports.conf
+# Configure Apache to serve Laravel's public directory on PORT
+RUN a2dissite 000-default 2>/dev/null; \
+    a2enmod rewrite; \
+    echo "Listen ${PORT}" > /etc/apache2/ports.conf
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+RUN a2ensite 000-default
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip curl libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
