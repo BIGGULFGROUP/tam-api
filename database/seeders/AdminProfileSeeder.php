@@ -15,28 +15,32 @@ class AdminProfileSeeder extends Seeder
         AdminProfile::updateOrCreate(
             ['email' => 'admin@theafricanmail.com'],
             [
-                'password'     => bcrypt('Admin@1234'),
-                'display_name' => 'Super Admin',
-                'full_name'    => 'Super Admin',
-                'username'     => 'superadmin',
-                'role'         => 'super_admin',
-                'is_active'    => true,
-                'is_public'    => false,
+                'password'                   => bcrypt('Admin@1234'),
+                'display_name'               => 'Super Admin',
+                'full_name'                  => 'Super Admin',
+                'username'                   => 'superadmin',
+                'role'                       => 'super_admin',
+                'access_tier'                => 'backend_admin',
+                'can_access_frontend_panel'  => true,
+                'can_access_backend_panel'   => true,
+                'is_active'                  => true,
+                'is_public'                  => false,
             ]
         );
 
-        // Seed a specific admin account requested by the developer.
         AdminProfile::updateOrCreate(
             ['email' => 'ahmaduabubakarr@gmail.com'],
             [
-                // Default password: change immediately after first login
-                'password'     => bcrypt('Admin@1234'),
-                'display_name' => 'Ahmadu Abubakarr',
-                'full_name'    => 'Ahmadu Abubakarr',
-                'username'     => 'Muslim007',
-                'role'         => 'super_admin',
-                'is_active'    => true,
-                'is_public'    => false,
+                'password'                   => bcrypt('Admin@1234'),
+                'display_name'               => 'Ahmadu Abubakarr',
+                'full_name'                  => 'Ahmadu Abubakarr',
+                'username'                   => 'Muslim007',
+                'role'                       => 'super_admin',
+                'access_tier'                => 'backend_admin',
+                'can_access_frontend_panel'  => true,
+                'can_access_backend_panel'   => true,
+                'is_active'                  => true,
+                'is_public'                  => false,
             ]
         );
     }
