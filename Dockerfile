@@ -33,8 +33,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
     && npm run build \
     && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/app/public bootstrap/cache \
     && chown -R www-data:www-data /app \
-    && chmod -R 755 /app/storage /app/bootstrap/cache
+    && chmod -R 755 /app/storage /app/bootstrap/cache \
+    && chmod +x /app/start.sh
 
 EXPOSE 8080
 
-CMD ["apache2-foreground"]
+CMD ["/app/start.sh"]
