@@ -40,13 +40,24 @@ if ! grep -q "APP_KEY=base64:" /app/.env; then
     echo "==> APP_KEY generated"
 fi
 
+# Clear cached config from previous builds so env changes take effect
+php artisan config:clear 2>/dev/null || true
+
 # Run migrations
 echo "==> Running migrations..."
 php artisan migrate --force --no-interaction || echo "⚠ Migration step done"
 
-# Cache
+# Run seeders (idempotent — updateOrCreate)
+echo "==> Running seeders..."
+php artisan db:seed --force --no-interaction || echo "⚠ Seeder step done"
+
+# Cache for production
 php artisan config:cache 2>/dev/null || true
 php artisan route:cache 2>/dev/null || true
+
+# Start Laravel scheduler in background (runs every minute, auto-restarts)
+echo "==> Starting scheduler..."
+php artisan schedule:work &
 
 echo "==> Starting Apache..."
 exec apache2-foreground
