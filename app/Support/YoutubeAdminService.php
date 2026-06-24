@@ -97,11 +97,21 @@ class YoutubeAdminService
             return ['error' => 'YouTube API key is missing', 'status' => 500];
         }
 
-        $response = Http::get('https://www.googleapis.com/youtube/v3/channels', [
+        // Detect if input looks like a username (@handle) vs channel ID (UC...)
+        $isUsername = str_starts_with($channelId, '@');
+
+        $params = [
             'part' => 'snippet,statistics',
-            'id' => $channelId,
             'key' => $apiKeyStatus['key'],
-        ]);
+        ];
+
+        if ($isUsername) {
+            $params['forUsername'] = ltrim($channelId, '@');
+        } else {
+            $params['id'] = $channelId;
+        }
+
+        $response = Http::get('https://www.googleapis.com/youtube/v3/channels', $params);
 
         $payload = $response->json() ?? [];
         if (! $response->successful()) {
@@ -110,11 +120,13 @@ class YoutubeAdminService
 
         $item = data_get($payload, 'items.0');
         if (! is_array($item)) {
-            return ['error' => 'Channel not found', 'status' => 404];
+            return ['error' => $isUsername ? 'Channel not found for that username. Try using the Channel ID instead.' : 'Channel not found', 'status' => 404];
         }
 
+        $resolvedId = (string) data_get($item, 'id', $channelId);
+
         return [
-            'id' => $channelId,
+            'id' => $resolvedId,
             'title' => (string) data_get($item, 'snippet.title', ''),
             'subscriberCount' => (int) data_get($item, 'statistics.subscriberCount', 0),
         ];
