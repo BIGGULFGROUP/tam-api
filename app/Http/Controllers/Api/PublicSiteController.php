@@ -172,6 +172,7 @@ class PublicSiteController extends Controller
             'body' => ['required', 'string', 'max:1000'],
             'authorName' => ['required', 'string', 'max:120'],
             'authorEmail' => ['nullable', 'email'],
+            'recaptcha_token' => [new \App\Rules\RecaptchaV3()],
         ]);
 
         Comment::query()->create([
@@ -199,6 +200,7 @@ class PublicSiteController extends Controller
             'source' => ['nullable', 'string', 'max:60'],
             'popupType' => ['nullable', 'string', 'max:120'],
             'context' => ['nullable', 'array'],
+            'recaptcha_token' => [new \App\Rules\RecaptchaV3()],
         ]);
 
         $email = Str::lower(trim($data['email']));

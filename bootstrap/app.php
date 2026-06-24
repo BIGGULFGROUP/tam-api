@@ -4,6 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Http\Middleware\EnsureAdminPanelAccess;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -25,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
+
+        // Rate limiters
+        RateLimiter::for('comments', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        RateLimiter::for('newsletter', fn (Request $request) => Limit::perMinute(3)->by($request->ip()));
+        RateLimiter::for('content-view', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Always return JSON for API routes

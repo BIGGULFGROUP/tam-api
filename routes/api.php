@@ -32,15 +32,25 @@ Route::prefix('public')->group(function () {
     Route::get('authors/slug/{slug}', [PublicSiteController::class, 'authorBySlug']);
     Route::get('authors/name/{name}', [PublicSiteController::class, 'authorByName']);
     Route::get('authors/{id}', [PublicSiteController::class, 'authorById']);
-    Route::post('content/view', [PublicSiteController::class, 'recordView']);
     Route::get('site/settings', [PublicSiteController::class, 'siteSettings']);
     Route::get('comments', [PublicSiteController::class, 'comments']);
-    Route::post('comments', [PublicSiteController::class, 'submitComment']);
     Route::get('newsletters', [PublicSiteController::class, 'newsletters']);
-    Route::post('newsletter', [PublicSiteController::class, 'subscribeNewsletter']);
     Route::get('newsletter/popup-config', [PublicSiteController::class, 'popupConfig']);
-    Route::post('newsletter/popup-event', [PublicSiteController::class, 'popupEvent']);
-    Route::post('newsletter/banner-event', [PublicSiteController::class, 'popupEvent']);
+
+    // Rate-limited POST endpoints
+    Route::middleware('throttle:comments')->group(function () {
+        Route::post('comments', [PublicSiteController::class, 'submitComment']);
+    });
+
+    Route::middleware('throttle:newsletter')->group(function () {
+        Route::post('newsletter', [PublicSiteController::class, 'subscribeNewsletter']);
+        Route::post('newsletter/popup-event', [PublicSiteController::class, 'popupEvent']);
+        Route::post('newsletter/banner-event', [PublicSiteController::class, 'popupEvent']);
+    });
+
+    Route::middleware('throttle:content-view')->group(function () {
+        Route::post('content/view', [PublicSiteController::class, 'recordView']);
+    });
 });
 
 $frontendDomain = config('admin-access.frontend_domain');
