@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SiteSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class SiteSettingController extends Controller
 {
@@ -64,7 +65,9 @@ class SiteSettingController extends Controller
             'ad_placements' => ['sometimes', 'array'],
         ]);
 
-        $payload = array_merge(['id' => 1], array_intersect_key($validated, array_flip(self::ALLOWED)));
+        // Filter to only columns that actually exist (defensive: migrations may be pending)
+        $availableFields = array_filter(self::ALLOWED, fn ($field) => Schema::hasColumn('site_settings', $field));
+        $payload = array_merge(['id' => 1], array_intersect_key($validated, array_flip($availableFields)));
         $setting = SiteSetting::updateOrCreate(['id' => 1], $payload);
 
         return response()->json($setting);
