@@ -132,8 +132,9 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Revoke all previous tokens for this admin (single-session policy)
-        $admin->tokens()->delete();
+        // Delete only existing tokens for THIS panel — avoids race condition
+        // when frontend and backend login run in parallel (both would delete each other's tokens)
+        $admin->tokens()->where('name', $panel.'-admin-token')->delete();
         $admin->forceFill(['last_login' => now()])->save();
 
         $token = $admin->createToken($panel.'-admin-token', [$panel.':access'])->plainTextToken;

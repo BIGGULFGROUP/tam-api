@@ -11,10 +11,11 @@ class SiteSettingsSeeder extends Seeder
     {
         // site_settings uses a singleton row with id=1
         DB::table('site_settings')->insertOrIgnore([
-            'id'         => 1,
-            'site_name'  => 'The African Mail',
-            'created_at' => now(),
-            'updated_at' => now(),
+            'id'                  => 1,
+            'site_name'           => 'The African Mail',
+            'permalink_structure' => 'plain',
+            'created_at'          => now(),
+            'updated_at'          => now(),
         ]);
     }
 }
