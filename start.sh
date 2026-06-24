@@ -40,8 +40,10 @@ if ! grep -q "APP_KEY=base64:" /app/.env; then
     echo "==> APP_KEY generated"
 fi
 
-# Clear cached config from previous builds so env changes take effect
-php artisan config:clear 2>/dev/null || true
+# Force-clear ALL cached config/route files from previous builds
+# These MUST be cleared before migrations or env changes won't apply
+rm -f /app/bootstrap/cache/*.php 2>/dev/null || true
+echo "==> Config cache cleared"
 
 # Run migrations
 echo "==> Running migrations..."

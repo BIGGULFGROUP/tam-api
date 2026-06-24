@@ -57,6 +57,7 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
     Route::prefix($frontendPrefix)->group(function () {
         Route::prefix('auth')->group(function () {
             Route::post('login', [AuthController::class, 'loginFrontend']);
+            Route::get('status', [AuthController::class, 'status']);
         });
 
         Route::middleware(['auth:sanctum', 'admin.panel:frontend'])->group(function () {

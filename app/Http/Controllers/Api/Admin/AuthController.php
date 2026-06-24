@@ -174,4 +174,30 @@ class AuthController extends Controller
             'updated_at'   => $admin->updated_at,
         ];
     }
+
+    /**
+     * GET /api/{panel}-admin/auth/status — no-auth health check for session debugging.
+     */
+    public function status(Request $request): JsonResponse
+    {
+        $dbOk = false;
+        try {
+            \Illuminate\Support\Facades\DB::connection()->getPdo();
+            $dbOk = true;
+        } catch (\Throwable $e) {
+            // DB unreachable
+        }
+
+        $hasCache = file_exists(base_path('bootstrap/cache/config.php'));
+        $envKey = config('app.key') ? 'present' : 'missing';
+
+        return response()->json([
+            'ok' => true,
+            'database' => $dbOk ? 'connected' : 'unreachable',
+            'config_cached' => $hasCache,
+            'app_key' => $envKey,
+            'app_url' => config('app.url'),
+            'sanctum_expiration_minutes' => config('sanctum.expiration'),
+        ]);
+    }
 }
