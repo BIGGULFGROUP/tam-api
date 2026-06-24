@@ -47,9 +47,9 @@ class SiteSettingController extends Controller
             'newsletter_enabled' => ['sometimes', 'boolean'],
             'articles_enabled' => ['sometimes', 'boolean'],
             'review_workflow' => ['sometimes', 'boolean'],
-            'autosave_interval' => ['sometimes', 'integer', 'min:15', 'max:600'],
+            'autosave_interval' => ['sometimes', 'nullable', 'integer', 'min:15', 'max:600'],
             'newsletter_popup_enabled' => ['sometimes', 'boolean'],
-            'newsletter_popup_interval_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
+            'newsletter_popup_interval_hours' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:168'],
             'newsletter_popup_template' => ['sometimes', 'nullable', 'string', 'max:255'],
             'newsletter_popup_title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'newsletter_popup_body' => ['sometimes', 'nullable', 'string'],
@@ -58,8 +58,8 @@ class SiteSettingController extends Controller
             'youtube_api_key' => ['sometimes', 'nullable', 'string'],
             'youtube_channel_id' => ['sometimes', 'nullable', 'string', 'max:255'],
             'shorts_autofetch_enabled' => ['sometimes', 'boolean'],
-            'shorts_autofetch_interval_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
-            'max_shorts_per_channel' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'shorts_autofetch_interval_hours' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:168'],
+            'max_shorts_per_channel' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:50'],
             'auto_publish_fetched' => ['sometimes', 'boolean'],
             'permalink_structure' => ['sometimes', 'in:plain,type-slug,type-date-slug'],
             'ad_placements' => ['sometimes', 'nullable', 'array'],
@@ -68,8 +68,18 @@ class SiteSettingController extends Controller
         // Filter to only columns that actually exist (defensive: migrations may be pending)
         $availableFields = array_filter(self::ALLOWED, fn ($field) => Schema::hasColumn('site_settings', $field));
         $payload = array_merge(['id' => 1], array_intersect_key($validated, array_flip($availableFields)));
-        $setting = SiteSetting::updateOrCreate(['id' => 1], $payload);
 
-        return response()->json($setting);
+        try {
+            $setting = SiteSetting::updateOrCreate(['id' => 1], $payload);
+            return response()->json($setting);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SiteSetting upsert failed', [
+                'error' => $e->getMessage(),
+                'payload_keys' => array_keys($payload),
+            ]);
+            return response()->json([
+                'error' => 'Database error: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
