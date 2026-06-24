@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\YoutubeAdminService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,7 +30,32 @@ class CategoryController extends Controller
     public function update(Request $request, string $slug): JsonResponse
     {
         $category = Category::where('slug', $slug)->firstOrFail();
+
+        $hadChannel = $category->youtube_channel_id || $category->youtube_channel_username;
         $category->update($request->except(['slug', 'id']));
+        $category->refresh();
+        $hasChannel = $category->youtube_channel_id || $category->youtube_channel_username;
+
+        // Auto-fetch when a YouTube channel is newly connected
+        if (! $hadChannel && $hasChannel) {
+            try {
+                $service = app(YoutubeAdminService::class);
+                $service->fetchCategoryVideos(
+                    $category->slug,
+                    10,
+                    $request->user()?->id,
+                    $request->user()?->id,
+                    'auto'
+                );
+            } catch (\Throwable $e) {
+                // Log but don't block the update — fetch runs best-effort
+                \Illuminate\Support\Facades\Log::warning(
+                    'Auto-fetch on channel connect failed for category: ' . $category->slug,
+                    ['error' => $e->getMessage()]
+                );
+            }
+        }
+
         return response()->json($category->fresh());
     }
 }

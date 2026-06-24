@@ -299,6 +299,8 @@ class YoutubeAdminService
         ?string $triggeredByAdmin = null,
         string $triggeredBy = 'manual'
     ): array {
+        $settings = $this->getAutofetchSettings();
+        $importStatus = $settings['autoPublish'] ? 'published' : 'draft';
         $category = Category::query()
             ->select(['id', 'slug', 'youtube_channel_id', 'youtube_playlist_id', 'youtube_channel_username'])
             ->where('slug', $categorySlug)
@@ -476,7 +478,7 @@ class YoutubeAdminService
 
             if ($existing) {
                 $updatePayload = array_merge($commonPayload, [
-                    'status' => $existing->status ?: 'draft',
+                    'status' => $existing->status ?: $importStatus,
                 ]);
 
                 if ($selectedAuthor['id'] ?? null) {
@@ -495,7 +497,7 @@ class YoutubeAdminService
             $created = Video::query()->create(array_merge($commonPayload, [
                 'slug' => $this->uniqueSlug($title),
                 'created_by' => $selectedAuthor['id'] ?? $channelAuthorId ?? $triggeredByAdmin,
-                'status' => 'draft',
+                'status' => $importStatus,
             ]));
 
             if ($created) {
@@ -533,6 +535,7 @@ class YoutubeAdminService
             'enabled' => (bool) ($settings->shorts_autofetch_enabled ?? false),
             'intervalHours' => max(1, (int) ($settings->shorts_autofetch_interval_hours ?? 6)),
             'maxPerChannel' => max(1, (int) ($settings->max_shorts_per_channel ?? 5)),
+            'autoPublish' => (bool) ($settings->auto_publish_fetched ?? false),
         ];
     }
 

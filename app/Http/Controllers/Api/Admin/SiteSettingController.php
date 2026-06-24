@@ -19,7 +19,7 @@ class SiteSettingController extends Controller
         'newsletter_popup_template', 'newsletter_popup_title',
         'newsletter_popup_body', 'newsletter_popup_categories',
         'youtube_api_key', 'youtube_channel_id', 'shorts_autofetch_enabled',
-        'shorts_autofetch_interval_hours', 'max_shorts_per_channel',
+        'shorts_autofetch_interval_hours', 'max_shorts_per_channel', 'auto_publish_fetched',
         'permalink_structure', 'ad_placements',
     ];
 
@@ -59,6 +59,7 @@ class SiteSettingController extends Controller
             'shorts_autofetch_enabled' => ['sometimes', 'boolean'],
             'shorts_autofetch_interval_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
             'max_shorts_per_channel' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'auto_publish_fetched' => ['sometimes', 'boolean'],
             'permalink_structure' => ['sometimes', 'in:plain,type-slug,type-date-slug'],
             'ad_placements' => ['sometimes', 'array'],
         ]);

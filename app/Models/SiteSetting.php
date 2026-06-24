@@ -22,6 +22,7 @@ class SiteSetting extends Model
         'newsletter_popup_body', 'newsletter_popup_categories',
         'youtube_api_key', 'youtube_channel_id', 'shorts_autofetch_enabled',
         'shorts_autofetch_interval_hours', 'max_shorts_per_channel',
+        'auto_publish_fetched',
         'permalink_structure', 'ad_placements',
     ];
 
@@ -35,6 +36,7 @@ class SiteSetting extends Model
             'review_workflow'                  => 'boolean',
             'newsletter_popup_enabled'         => 'boolean',
             'shorts_autofetch_enabled'         => 'boolean',
+            'auto_publish_fetched'             => 'boolean',
             'newsletter_popup_categories'      => 'array',
             'ad_placements'                    => 'array',
             'autosave_interval'                => 'integer',
