@@ -20,7 +20,7 @@ class SiteSetting extends Model
         'newsletter_popup_enabled', 'newsletter_popup_interval_hours',
         'newsletter_popup_template', 'newsletter_popup_title',
         'newsletter_popup_body', 'newsletter_popup_categories',
-        'youtube_api_key', 'youtube_channel_id', 'shorts_autofetch_enabled',
+        'youtube_api_key', 'shorts_autofetch_enabled',
         'shorts_autofetch_interval_hours', 'max_shorts_per_channel',
         'auto_publish_fetched',
         'permalink_structure', 'ad_placements',
