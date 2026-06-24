@@ -16,7 +16,7 @@ use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Services\BrevoService;
 
 class PublicSiteController extends Controller
 {
@@ -239,6 +239,26 @@ class PublicSiteController extends Controller
             'success' => true,
             'message' => 'Subscribed successfully!',
         ]);
+
+        // Sync to Brevo
+        $this->syncToBrevo($email, $data['name'] ?? null, $categories);
+    }
+
+    private function syncToBrevo(string $email, ?string $name, array $niches): void
+    {
+        try {
+            $brevo = app(BrevoService::class);
+            $brevo->syncContact($email, [
+                'FIRSTNAME' => $name ?? explode('@', $email)[0],
+                'NICHES' => implode(', ', $niches),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Brevo sync failed in subscribe', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
     }
 
     public function popupConfig(Request $request): JsonResponse

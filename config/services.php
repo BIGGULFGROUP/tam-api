@@ -40,4 +40,19 @@ return [
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
     ],
 
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+        'sender_email' => env('BREVO_SENDER_EMAIL', 'noreply@theafricanmail.com'),
+        'sender_name' => env('BREVO_SENDER_NAME', 'The African Mail'),
+        'template_daily_digest' => env('BREVO_TEMPLATE_DAILY_DIGEST', 1),
+        'template_breaking_news' => env('BREVO_TEMPLATE_BREAKING_NEWS', 2),
+        'template_weekly_roundup' => env('BREVO_TEMPLATE_WEEKLY_ROUNDUP', 3),
+    ],
+
+    'webpush' => [
+        'subject' => env('WEB_PUSH_SUBJECT'),
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+    ],
+
 ];
