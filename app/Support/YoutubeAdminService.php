@@ -97,16 +97,17 @@ class YoutubeAdminService
             return ['error' => 'YouTube API key is missing', 'status' => 500];
         }
 
-        // Detect if input looks like a username (@handle) vs channel ID (UC...)
-        $isUsername = str_starts_with($channelId, '@');
+        // Detect if input is a handle (@name) vs channel ID (UC...)
+        $isHandle = str_starts_with($channelId, '@');
 
         $params = [
             'part' => 'snippet,statistics',
             'key' => $apiKeyStatus['key'],
         ];
 
-        if ($isUsername) {
-            $params['forUsername'] = ltrim($channelId, '@');
+        if ($isHandle) {
+            // YouTube Data API v3 — forHandle supports modern @handles
+            $params['forHandle'] = ltrim($channelId, '@');
         } else {
             $params['id'] = $channelId;
         }
@@ -120,7 +121,7 @@ class YoutubeAdminService
 
         $item = data_get($payload, 'items.0');
         if (! is_array($item)) {
-            return ['error' => $isUsername ? 'Channel not found for that username. Try using the Channel ID instead.' : 'Channel not found', 'status' => 404];
+            return ['error' => $isHandle ? 'Channel not found for that handle. Try using the Channel ID instead.' : 'Channel not found', 'status' => 404];
         }
 
         $resolvedId = (string) data_get($item, 'id', $channelId);
@@ -153,12 +154,25 @@ class YoutubeAdminService
         }
 
         if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && $category->youtube_channel_username) {
+            $handle = ltrim((string) $category->youtube_channel_username, '@');
+            // Try forHandle first (modern @handles), fall back to forUsername (legacy)
             $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
                 'part' => 'id',
-                'forUsername' => $category->youtube_channel_username,
+                'forHandle' => $handle,
                 'key' => $apiKeyStatus['key'],
             ]);
             $channelId = data_get($resolveResponse->json(), 'items.0.id');
+
+            if (! $channelId) {
+                // Fallback: try legacy username lookup
+                $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
+                    'part' => 'id',
+                    'forUsername' => $handle,
+                    'key' => $apiKeyStatus['key'],
+                ]);
+                $channelId = data_get($resolveResponse->json(), 'items.0.id');
+            }
+
             if ($channelId) {
                 $category->youtube_channel_id = $channelId;
                 $category->save();
@@ -341,12 +355,24 @@ class YoutubeAdminService
         }
 
         if (! $category->youtube_channel_id && ! $category->youtube_playlist_id && $category->youtube_channel_username) {
+            $handle = ltrim((string) $category->youtube_channel_username, '@');
+            // Try forHandle first (modern @handles), fall back to forUsername (legacy)
             $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
                 'part' => 'id',
-                'forUsername' => $category->youtube_channel_username,
+                'forHandle' => $handle,
                 'key' => $apiKeyStatus['key'],
             ]);
             $channelId = data_get($resolveResponse->json(), 'items.0.id');
+
+            if (! $channelId) {
+                $resolveResponse = Http::get('https://www.googleapis.com/youtube/v3/channels', [
+                    'part' => 'id',
+                    'forUsername' => $handle,
+                    'key' => $apiKeyStatus['key'],
+                ]);
+                $channelId = data_get($resolveResponse->json(), 'items.0.id');
+            }
+
             if ($channelId) {
                 $category->youtube_channel_id = $channelId;
                 $category->save();
