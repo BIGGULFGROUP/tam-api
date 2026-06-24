@@ -53,7 +53,7 @@ class SiteSettingController extends Controller
             'newsletter_popup_template' => ['sometimes', 'nullable', 'string', 'max:255'],
             'newsletter_popup_title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'newsletter_popup_body' => ['sometimes', 'nullable', 'string'],
-            'newsletter_popup_categories' => ['sometimes', 'array'],
+            'newsletter_popup_categories' => ['sometimes', 'nullable', 'array'],
             'newsletter_popup_categories.*' => ['string', 'max:120'],
             'youtube_api_key' => ['sometimes', 'nullable', 'string'],
             'youtube_channel_id' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -62,7 +62,7 @@ class SiteSettingController extends Controller
             'max_shorts_per_channel' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'auto_publish_fetched' => ['sometimes', 'boolean'],
             'permalink_structure' => ['sometimes', 'in:plain,type-slug,type-date-slug'],
-            'ad_placements' => ['sometimes', 'array'],
+            'ad_placements' => ['sometimes', 'nullable', 'array'],
         ]);
 
         // Filter to only columns that actually exist (defensive: migrations may be pending)
