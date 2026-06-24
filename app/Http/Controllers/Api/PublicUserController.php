@@ -282,4 +282,30 @@ class PublicUserController extends Controller
 
         return response()->json(['unregistered' => true]);
     }
+
+    // ─── Web Push ──────────────────────────────────────────────
+
+    public function subscribeWebPush(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'endpoint' => ['required', 'string'],
+            'p256dh' => ['required', 'string'],
+            'auth' => ['required', 'string'],
+        ]);
+
+        DB::table('web_push_subscriptions')->updateOrInsert(
+            ['endpoint' => $data['endpoint']],
+            [
+                'id' => Str::uuid(),
+                'endpoint' => $data['endpoint'],
+                'p256dh' => $data['p256dh'],
+                'auth' => $data['auth'],
+                'user_id' => $request->user()?->id,
+                'is_active' => true,
+                'updated_at' => now(),
+            ]
+        );
+
+        return response()->json(['subscribed' => true]);
+    }
 }

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Admin\ActivityLogController;
 use App\Http\Controllers\Api\Admin\YoutubeController;
 use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
+use App\Http\Controllers\Api\Admin\PushNotificationController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\PublicUserController;
 
@@ -53,6 +54,11 @@ Route::prefix('public')->group(function () {
 
     Route::middleware('throttle:content-view')->group(function () {
         Route::post('content/view', [PublicSiteController::class, 'recordView']);
+    });
+
+    // Web push subscription
+    Route::middleware('throttle:newsletter')->group(function () {
+        Route::post('push/subscribe', [PublicUserController::class, 'subscribeWebPush']);
     });
 
     // User profiles (public)
@@ -206,6 +212,9 @@ $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
             Route::post('youtube/fetch', [YoutubeController::class, 'fetch']);
             Route::get('youtube/autofetch', [YoutubeController::class, 'autofetchStatus']);
             Route::post('youtube/autofetch', [YoutubeController::class, 'autofetch']);
+
+            Route::get('push/status', [PushNotificationController::class, 'status']);
+            Route::post('push/send', [PushNotificationController::class, 'send']);
         });
     });
 });

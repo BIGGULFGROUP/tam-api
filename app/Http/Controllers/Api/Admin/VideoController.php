@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ContentRevision;
 use App\Models\Video;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,17 @@ class VideoController extends Controller
             return $video;
         });
 
+        // Send push notification if published as breaking news
+        if (($data['status'] ?? null) === 'published' && ($data['is_breaking'] ?? false)) {
+            app(PushNotificationService::class)->sendBreakingNews([
+                'id' => $video->id,
+                'title' => $video->title,
+                'body' => $video->description ?? $video->title,
+                'niche' => $video->niche,
+                'slug' => $video->slug,
+            ]);
+        }
+
         return response()->json($video->fresh(['tagRelations']), 201);
     }
 
@@ -140,6 +152,8 @@ class VideoController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated, $video, $id, $originalCreator) {
+            $wasAlreadyPublished = $video->status === 'published';
+
             $video->update($validated);
 
             if ($request->has('title')) {
@@ -152,6 +166,19 @@ class VideoController extends Controller
             }
 
             $this->syncCreatorCounts([$originalCreator, $video->created_by]);
+
+            // Send push when content transitions to published + breaking
+            $isNowPublished = $video->status === 'published';
+            $isNowBreaking = (bool) $video->is_breaking;
+            if ($isNowPublished && $isNowBreaking && !$wasAlreadyPublished) {
+                app(PushNotificationService::class)->sendBreakingNews([
+                    'id' => $video->id,
+                    'title' => $video->title,
+                    'body' => $video->description ?? $video->title,
+                    'niche' => $video->niche,
+                    'slug' => $video->slug,
+                ]);
+            }
         });
 
         return response()->json($video->fresh(['tagRelations']));
