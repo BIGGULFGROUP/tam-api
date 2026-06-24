@@ -17,7 +17,10 @@ use App\Http\Controllers\Api\Admin\AnalyticsController;
 use App\Http\Controllers\Api\Admin\AccountController;
 use App\Http\Controllers\Api\Admin\ActivityLogController;
 use App\Http\Controllers\Api\Admin\YoutubeController;
+use App\Http\Controllers\Api\Admin\SponsoredContentController;
+use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\PublicSiteController;
+use App\Http\Controllers\Api\PublicUserController;
 
 Route::prefix('public')->group(function () {
     Route::get('categories', [PublicSiteController::class, 'categories']);
@@ -51,6 +54,28 @@ Route::prefix('public')->group(function () {
     Route::middleware('throttle:content-view')->group(function () {
         Route::post('content/view', [PublicSiteController::class, 'recordView']);
     });
+
+    // User profiles (public)
+    Route::get('profile/{username}', [PublicUserController::class, 'profile']);
+
+    // Authenticated user endpoints
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::put('profile', [PublicUserController::class, 'updateProfile']);
+        Route::get('favorites', [PublicUserController::class, 'favorites']);
+        Route::post('favorites/{contentId}', [PublicUserController::class, 'toggleFavorite']);
+        Route::delete('favorites/{contentId}', [PublicUserController::class, 'toggleFavorite']);
+        Route::get('history', [PublicUserController::class, 'history']);
+        Route::post('history', [PublicUserController::class, 'recordView']);
+        Route::put('notification-preferences', [PublicUserController::class, 'updateNotificationPrefs']);
+        Route::post('push/register', [PublicUserController::class, 'registerPushToken']);
+        Route::delete('push/register', [PublicUserController::class, 'unregisterPushToken']);
+    });
+
+    // Affiliate redirect
+    Route::get('affiliate/{slug}', [AffiliateLinkController::class, 'recordClick']);
+
+    // Sponsored content (public)
+    Route::get('sponsored', [SponsoredContentController::class, 'index']);
 });
 
 $frontendDomain = config('admin-access.frontend_domain');
@@ -120,6 +145,9 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
 
             Route::get('analytics/my-content', [AnalyticsController::class, 'myContent']);
             Route::get('youtube/preview', [YoutubeController::class, 'preview']);
+
+            Route::apiResource('sponsored', SponsoredContentController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::apiResource('affiliates', AffiliateLinkController::class)->only(['index', 'store', 'update', 'destroy']);
 
             Route::prefix('account')->group(function () {
                 Route::get('notifications', [AccountController::class, 'notifications']);
