@@ -46,19 +46,20 @@ rm -f /app/bootstrap/cache/*.php 2>/dev/null || true
 echo "==> Config cache cleared"
 
 # Run migrations
-echo "==> Running migrations..."
 php artisan migrate --force --no-interaction || echo "⚠ Migration step done"
 
-# Run seeders (idempotent — updateOrCreate)
-echo "==> Running seeders..."
-php artisan db:seed --force --no-interaction || echo "⚠ Seeder step done"
-
-# Cache for production
+# Cache config + routes BEFORE starting Apache (critical for Render's tight startup window)
 php artisan config:cache 2>/dev/null || true
 php artisan route:cache 2>/dev/null || true
 
-# Start Laravel scheduler in background (runs every minute, auto-restarts)
-echo "==> Starting scheduler..."
+# Run seeders in background AFTER Apache starts — idempotent, can survive SIGKILL
+(
+  sleep 5
+  php artisan db:seed --force --no-interaction 2>&1 || true
+  echo "==> Seeders done"
+) &
+
+# Start scheduler (also returns immediately)
 php artisan schedule:work &
 
 echo "==> Starting Apache..."
