@@ -115,9 +115,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Account is inactive.'], 403);
         }
 
+        // Use role registry directly instead of model columns — columns may be stale after migration.
+        // The model's saving boot event would recalculate them, but that runs AFTER this check.
+        $panelAccess = AdminRoleRegistry::panelAccessFor($admin->role);
         $canAccessPanel = match ($panel) {
-            'frontend' => $admin->canAccessFrontendPanel(),
-            'backend' => $admin->canAccessBackendPanel(),
+            'frontend' => $panelAccess['frontend'] ?? false,
+            'backend' => $panelAccess['backend'] ?? false,
             default => false,
         };
 
