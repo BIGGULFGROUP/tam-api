@@ -12,7 +12,19 @@ class CategoryController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(Category::orderBy('sort_order')->get());
+        $categories = Category::orderBy('sort_order')->get();
+
+        // Append real video counts
+        $counts = \App\Models\Video::query()
+            ->selectRaw('niche, count(*) as total')
+            ->groupBy('niche')
+            ->pluck('total', 'niche');
+
+        $categories->each(function (Category $category) use ($counts) {
+            $category->content_count = (int) ($counts[$category->slug] ?? 0);
+        });
+
+        return response()->json($categories);
     }
 
     public function store(Request $request): JsonResponse
