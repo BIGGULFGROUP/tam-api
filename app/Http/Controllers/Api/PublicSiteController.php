@@ -260,7 +260,7 @@ class PublicSiteController extends Controller
             ]);
         }
     }
-    }
+    
 
     public function popupConfig(Request $request): JsonResponse
     {
