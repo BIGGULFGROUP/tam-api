@@ -19,7 +19,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_filter(array_map('trim', explode(',', env('FRONTEND_URL', 'http://localhost:3000,http://localhost:3001')))),
+    'allowed_origins' => array_values(array_unique(array_filter(array_map('trim', array_merge(
+        explode(',', (string) env('FRONTEND_URL', '')),
+        ['https://theafricanmail.com', 'https://tam-web.onrender.com', 'https://tam-admin.onrender.com', 'http://localhost:3000', 'http://localhost:3001'],
+    ))))),
 
     'allowed_origins_patterns' => [],
 
