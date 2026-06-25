@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\BrevoService;
+use App\Services\RecommendationService;
 
 class PublicSiteController extends Controller
 {
@@ -798,4 +799,38 @@ class PublicSiteController extends Controller
             ? ($video->featured_image_url ?: $video->thumbnail_url ?: '')
             : ($video->thumbnail_url ?: $video->featured_image_url ?: '');
     }
+
+    // ─── Recommendations ─────────────────────────────────────
+
+    public function relatedContent(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'content_id' => ['required', 'uuid', 'exists:videos,id'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        $svc = app(RecommendationService::class);
+        $results = $svc->getRelated($data['content_id'], (int) ($data['limit'] ?? 6));
+
+        return response()->json(['items' => $results]);
+    }
+
+    public function trending(Request $request): JsonResponse
+    {
+        $limit = min(20, max(1, (int) $request->query('limit', 10)));
+        $svc = app(RecommendationService::class);
+        return response()->json(['items' => $svc->getTrending($limit)]);
+    }
+
+    public function recommendationsForUser(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            $svc = app(RecommendationService::class);
+            return response()->json(['items' => $svc->getTrending(10)]);
+        }
+        $svc = app(RecommendationService::class);
+        return response()->json(['items' => $svc->getForUser($user->id, 10)]);
+    }
+
 }

@@ -80,6 +80,11 @@ Route::prefix('public')->group(function () {
     // Affiliate redirect
     Route::get('affiliate/{slug}', [AffiliateLinkController::class, 'recordClick']);
 
+    // Recommendations
+    Route::get('recommendations/related', [PublicSiteController::class, 'relatedContent']);
+    Route::get('recommendations/trending', [PublicSiteController::class, 'trending']);
+    Route::middleware('auth:sanctum')->get('recommendations/for-you', [PublicSiteController::class, 'recommendationsForUser']);
+
     // Sponsored content (public)
     Route::get('sponsored', [SponsoredContentController::class, 'index']);
 });
