@@ -308,4 +308,117 @@ class PublicUserController extends Controller
 
         return response()->json(['subscribed' => true]);
     }
+
+    // ─── Avatar Upload ───────────────────────────────────────
+
+    public function uploadAvatar(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+        ]);
+
+        $file = $request->file('avatar');
+        $filename = 'avatars/' . $user->id . '-' . time() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('public', $filename);
+
+        $url = asset('storage/' . $filename);
+
+        DB::table('admin_profiles')->where('id', $user->id)->update([
+            'avatar_url' => $url,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['avatarUrl' => $url]);
+    }
+
+    // ─── Notifications ───────────────────────────────────────
+
+    public function notifications(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['items' => []]);
+
+        $limit = min(20, max(1, (int) $request->query('limit', 10)));
+        $unread = DB::table('user_notifications')
+            ->where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        $items = DB::table('user_notifications')
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($n) => [
+                'id' => $n->id,
+                'type' => $n->type,
+                'message' => $n->message,
+                'link' => $n->link,
+                'isRead' => (bool) $n->is_read,
+                'createdAt' => $n->created_at,
+            ]);
+
+        return response()->json(['items' => $items, 'unread' => $unread]);
+    }
+
+    public function markNotificationsRead(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+        $ids = $request->input('ids', []);
+        if (!empty($ids)) {
+            DB::table('user_notifications')
+                ->where('user_id', $user->id)
+                ->whereIn('id', $ids)
+                ->update(['is_read' => true, 'updated_at' => now()]);
+        } else {
+            DB::table('user_notifications')
+                ->where('user_id', $user->id)
+                ->update(['is_read' => true, 'updated_at' => now()]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    // ─── Account Deletion ────────────────────────────────────
+
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+        DB::transaction(function () use ($user) {
+            // Anonymize comments
+            DB::table('comments')->where('author_email', $user->email)->update([
+                'author_name' => 'Deleted User',
+                'author_email' => null,
+            ]);
+
+            // Remove push tokens
+            DB::table('push_tokens')->where('user_id', $user->id)->delete();
+            DB::table('web_push_subscriptions')->where('user_id', $user->id)->delete();
+
+            // Remove favorites
+            DB::table('user_favorites')->where('user_id', $user->id)->delete();
+
+            // Remove notifications
+            DB::table('user_notifications')->where('user_id', $user->id)->delete();
+
+            // Remove public profile
+            DB::table('public_user_profiles')->where('user_id', $user->id)->delete();
+
+            // Remove tokens
+            DB::table('personal_access_tokens')->where('tokenable_id', $user->id)->delete();
+
+            // Delete admin profile (main user record)
+            DB::table('admin_profiles')->where('id', $user->id)->delete();
+        });
+
+        return response()->json(['deleted' => true]);
+    }
+
 }

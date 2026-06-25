@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\Admin\PushNotificationController;
 use App\Http\Controllers\Api\PublicSiteController;
+use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\PublicUserController;
 
 Route::prefix('public')->group(function () {
@@ -42,8 +43,11 @@ Route::prefix('public')->group(function () {
     Route::get('newsletter/popup-config', [PublicSiteController::class, 'popupConfig']);
 
     // Rate-limited POST endpoints
+    // Comments (threaded + upvotable)
+    Route::get('comments/threaded', [CommentController::class, 'threaded']);
     Route::middleware('throttle:comments')->group(function () {
-        Route::post('comments', [PublicSiteController::class, 'submitComment']);
+        Route::post('comments', [CommentController::class, 'submit']);
+        Route::post('comments/{id}/upvote', [CommentController::class, 'upvote']);
     });
 
     Route::middleware('throttle:newsletter')->group(function () {
@@ -63,6 +67,15 @@ Route::prefix('public')->group(function () {
 
     // User profiles (public)
     Route::get('profile/{username}', [PublicUserController::class, 'profile']);
+
+    // Authenticated profile management
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::put('profile', [PublicUserController::class, 'updateProfile']);
+        Route::post('profile/avatar', [PublicUserController::class, 'uploadAvatar']);
+        Route::get('notifications', [PublicUserController::class, 'notifications']);
+        Route::post('notifications/read', [PublicUserController::class, 'markNotificationsRead']);
+        Route::delete('account', [PublicUserController::class, 'deleteAccount']);
+    });
 
     // Authenticated user endpoints
     Route::middleware('auth:sanctum')->group(function () {
