@@ -20,9 +20,12 @@ use App\Http\Controllers\Api\Admin\YoutubeController;
 use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\Admin\PushNotificationController;
+use App\Http\Controllers\Api\ContributorApplicationController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\CommentController as PublicCommentController;
 use App\Http\Controllers\Api\PublicUserController;
+
+Route::post('apply', [ContributorApplicationController::class, 'apply']);
 
 Route::prefix('public')->group(function () {
     Route::get('categories', [PublicSiteController::class, 'categories']);
@@ -87,6 +90,9 @@ Route::prefix('public')->group(function () {
 
     // Affiliate redirect
     Route::get('affiliate/{slug}', [AffiliateLinkController::class, 'recordClick']);
+
+    // Reader registration
+    Route::post('register', [PublicUserController::class, 'register']);
 
     // Recommendations
     Route::get('recommendations/related', [PublicSiteController::class, 'relatedContent']);
@@ -167,6 +173,10 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
 
             Route::apiResource('sponsored', SponsoredContentController::class)->only(['index', 'store', 'update', 'destroy']);
             Route::apiResource('affiliates', AffiliateLinkController::class)->only(['index', 'store', 'update', 'destroy']);
+
+            Route::get('applications', [ContributorApplicationController::class, 'index']);
+            Route::post('applications/{id}/approve', [ContributorApplicationController::class, 'approve']);
+            Route::post('applications/{id}/reject', [ContributorApplicationController::class, 'reject']);
 
             Route::prefix('account')->group(function () {
                 Route::get('notifications', [AccountController::class, 'notifications']);
