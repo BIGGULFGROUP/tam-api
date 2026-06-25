@@ -13,7 +13,7 @@ class SiteSetting extends Model
 
     protected $fillable = [
         'id', 'site_name', 'tagline', 'og_image_url',
-        'social_youtube_url', 'social_instagram_url', 'social_x_url', 'social_tiktok_url',
+        'social_youtube_url', 'social_facebook_url', 'social_instagram_url', 'social_linkedin_url', 'social_x_url', 'social_tiktok_url',
         'ga4_id', 'gtm_id', 'adsense_id',
         'maintenance_mode', 'comments_enabled', 'newsletter_enabled',
         'articles_enabled', 'review_workflow', 'autosave_interval',

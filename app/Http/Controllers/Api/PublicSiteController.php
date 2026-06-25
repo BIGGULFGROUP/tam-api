@@ -365,7 +365,9 @@ class PublicSiteController extends Controller
             'permalinkStructure' => $settings?->permalink_structure ?? 'plain',
             'socialLinks' => [
                 'youtubeUrl' => $settings?->social_youtube_url,
+                'facebookUrl' => $settings?->social_facebook_url,
                 'instagramUrl' => $settings?->social_instagram_url,
+                'linkedinUrl' => $settings?->social_linkedin_url,
                 'xUrl' => $settings?->social_x_url,
                 'tiktokUrl' => $settings?->social_tiktok_url,
             ],
