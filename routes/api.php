@@ -21,7 +21,7 @@ use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\Admin\PushNotificationController;
 use App\Http\Controllers\Api\PublicSiteController;
-use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\CommentController as PublicCommentController;
 use App\Http\Controllers\Api\PublicUserController;
 
 Route::prefix('public')->group(function () {
@@ -44,10 +44,10 @@ Route::prefix('public')->group(function () {
 
     // Rate-limited POST endpoints
     // Comments (threaded + upvotable)
-    Route::get('comments/threaded', [CommentController::class, 'threaded']);
+    Route::get('comments/threaded', [PublicCommentController::class, 'threaded']);
     Route::middleware('throttle:comments')->group(function () {
-        Route::post('comments', [CommentController::class, 'submit']);
-        Route::post('comments/{id}/upvote', [CommentController::class, 'upvote']);
+        Route::post('comments', [PublicCommentController::class, 'submit']);
+        Route::post('comments/{id}/upvote', [PublicCommentController::class, 'upvote']);
     });
 
     Route::middleware('throttle:newsletter')->group(function () {
@@ -75,11 +75,6 @@ Route::prefix('public')->group(function () {
         Route::get('notifications', [PublicUserController::class, 'notifications']);
         Route::post('notifications/read', [PublicUserController::class, 'markNotificationsRead']);
         Route::delete('account', [PublicUserController::class, 'deleteAccount']);
-    });
-
-    // Authenticated user endpoints
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::put('profile', [PublicUserController::class, 'updateProfile']);
         Route::get('favorites', [PublicUserController::class, 'favorites']);
         Route::post('favorites/{contentId}', [PublicUserController::class, 'toggleFavorite']);
         Route::delete('favorites/{contentId}', [PublicUserController::class, 'toggleFavorite']);
