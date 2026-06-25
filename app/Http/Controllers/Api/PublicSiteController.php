@@ -16,6 +16,7 @@ use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use App\Services\BrevoService;
 use App\Services\RecommendationService;
 
@@ -23,42 +24,34 @@ class PublicSiteController extends Controller
 {
     public function latestContent(Request $request): JsonResponse
     {
-        try {
-            $page = max(1, (int) $request->query('page', 1));
-            $limit = min(24, max(4, (int) $request->query('limit', 12)));
-            $offset = max(0, (int) $request->query('offset', ($page - 1) * $limit));
-            $rawLimit = min(120, $limit + 20);
-            $excludedIds = array_values(array_filter(explode(',', (string) $request->query('exclude', ''))));
+        $page = max(1, (int) $request->query('page', 1));
+        $limit = min(24, max(4, (int) $request->query('limit', 12)));
+        $offset = max(0, (int) $request->query('offset', ($page - 1) * $limit));
+        $rawLimit = min(120, $limit + 20);
+        $excludedIds = array_values(array_filter(explode(',', (string) $request->query('exclude', ''))));
 
-            $rows = Video::query()
-                ->select([
-                    'id', 'slug', 'title', 'description', 'thumbnail_url', 'featured_image_url',
-                    'niche', 'author', 'published_at', 'duration', 'views', 'content_type',
-                    'read_time', 'word_count', 'tags', 'youtube_id',
-                ])
-                ->where('status', 'published')
-                ->orderByDesc('published_at')
-                ->offset($offset)
-                ->limit($rawLimit)
-                ->get()
-                ->reject(fn (Video $video) => in_array((string) $video->id, $excludedIds, true))
-                ->values();
+        $rows = Video::query()
+            ->select([
+                'id', 'slug', 'title', 'description', 'thumbnail_url', 'featured_image_url',
+                'niche', 'author', 'published_at', 'duration', 'views', 'content_type',
+                'read_time', 'word_count', 'tags', 'youtube_id',
+            ])
+            ->where('status', 'published')
+            ->orderByDesc('published_at')
+            ->offset($offset)
+            ->limit($rawLimit)
+            ->get()
+            ->reject(fn (Video $video) => in_array((string) $video->id, $excludedIds, true))
+            ->values();
 
-            $paged = $rows->take($limit)->map(fn (Video $video) => $this->mapVideoPreview($video));
+        $paged = $rows->take($limit)->map(fn (Video $video) => $this->mapVideoPreview($video));
 
-            return response()->json([
-                'items' => $paged,
-                'hasMore' => $rows->count() === $rawLimit,
-                'page' => $page,
-                'nextOffset' => $offset + $rows->count(),
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ], 500);
-        }
+        return response()->json([
+            'items' => $paged,
+            'hasMore' => $rows->count() === $rawLimit,
+            'page' => $page,
+            'nextOffset' => $offset + $rows->count(),
+        ]);
     }
 
     public function navMenu(): JsonResponse
