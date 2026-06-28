@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Media;
+use App\Services\CloudinaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MediaController extends Controller
@@ -19,6 +19,11 @@ class MediaController extends Controller
         'video/mp4', 'video/webm', 'video/quicktime',
         'application/pdf', 'application/zip', 'text/plain',
     ];
+
+    public function __construct(
+        private readonly CloudinaryService $cloudinary,
+    ) {
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -41,7 +46,7 @@ class MediaController extends Controller
         };
 
         return response()->json($query->limit($limit)->get([
-            'id', 'file_name', 'public_url', 'mime_type',
+            'id', 'file_name', 'public_url', 'cloudinary_public_id', 'mime_type',
             'size_bytes', 'width', 'height', 'alt_text', 'caption', 'created_at',
         ]));
     }
@@ -64,34 +69,32 @@ class MediaController extends Controller
             return response()->json(['message' => 'Image exceeds maximum upload size (25MB)'], 413);
         }
 
-        $disk      = config('filesystems.default', 'public');
-        $now       = now();
-        $safeName  = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
-                     .'-'.$now->timestamp.'-'.Str::random(6)
-                     .'.'.$file->getClientOriginalExtension();
-        $path      = $now->format('Y/m').'/'.$safeName;
+        // Upload to Cloudinary
+        $result = $this->cloudinary->upload($file, [
+            'public_id' => 'tam-' . now()->timestamp . '-' . Str::random(8),
+        ]);
 
-        Storage::disk($disk)->putFileAs(dirname($path), $file, basename($path));
-        $publicUrl = Storage::disk($disk)->url($path);
-
-        [$width, $height] = $this->imageDimensions($file->getRealPath(), $mime);
+        if (!$result || !isset($result['url'])) {
+            return response()->json(['message' => 'Upload failed. Please try again.'], 500);
+        }
 
         $media = Media::create([
-            'id'           => Str::uuid(),
-            'file_name'    => $file->getClientOriginalName(),
-            'storage_path' => $path,
-            'public_url'   => $publicUrl,
-            'mime_type'    => $mime,
-            'size_bytes'   => $file->getSize(),
-            'width'        => $width,
-            'height'       => $height,
-            'alt_text'     => '',
-            'caption'      => '',
-            'uploaded_by'  => $request->user()?->id,
+            'id'                   => Str::uuid(),
+            'file_name'            => $file->getClientOriginalName(),
+            'storage_path'         => $result['public_id'] ?? '',
+            'cloudinary_public_id' => $result['public_id'] ?? '',
+            'public_url'           => $result['url'],
+            'mime_type'            => $mime,
+            'size_bytes'           => $result['size_bytes'] ?? $file->getSize(),
+            'width'                => $result['width'] ?? null,
+            'height'               => $result['height'] ?? null,
+            'alt_text'             => '',
+            'caption'              => '',
+            'uploaded_by'          => $request->user()?->id,
         ]);
 
         return response()->json($media->only([
-            'id', 'file_name', 'public_url', 'mime_type',
+            'id', 'file_name', 'public_url', 'cloudinary_public_id', 'mime_type',
             'size_bytes', 'width', 'height', 'alt_text', 'caption', 'created_at',
         ]), 201);
     }
@@ -106,8 +109,13 @@ class MediaController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $media = Media::findOrFail($id);
-        $disk  = config('filesystems.default', 'public');
-        Storage::disk($disk)->delete($media->storage_path);
+
+        // Delete from Cloudinary if we have a public_id
+        if ($media->cloudinary_public_id) {
+            $resourceType = $this->cloudinary->extractResourceType($media->public_url);
+            $this->cloudinary->delete($media->cloudinary_public_id, $resourceType);
+        }
+
         $media->delete();
         return response()->json(null, 204);
     }

@@ -55,4 +55,10 @@ return [
         'private_key' => env('VAPID_PRIVATE_KEY'),
     ],
 
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'dkswydvru'),
+        'api_key' => env('CLOUDINARY_API_KEY', '521953748497428'),
+        'api_secret' => env('CLOUDINARY_API_SECRET', 'WkTxsd6iibze9tVJsY6U68dUTUk'),
+    ],
+
 ];

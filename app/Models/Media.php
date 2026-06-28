@@ -12,7 +12,7 @@ class Media extends Model
     protected $table = 'media';
 
     protected $fillable = [
-        'file_name', 'storage_path', 'public_url', 'mime_type',
+        'file_name', 'storage_path', 'cloudinary_public_id', 'public_url', 'mime_type',
         'size_bytes', 'width', 'height', 'alt_text', 'caption', 'uploaded_by',
     ];
 
