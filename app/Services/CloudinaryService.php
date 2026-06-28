@@ -2,42 +2,30 @@
 
 namespace App\Services;
 
-use Cloudinary\Cloudinary;
-use Cloudinary\Api\Upload\UploadApi;
-use Cloudinary\Api\Admin\AdminApi;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CloudinaryService
 {
-    private Cloudinary $cloudinary;
     private string $cloudName;
+    private string $apiKey;
+    private string $apiSecret;
 
     public function __construct()
     {
         $this->cloudName = config('services.cloudinary.cloud_name', '');
-        $apiKey = config('services.cloudinary.api_key', '');
-        $apiSecret = config('services.cloudinary.api_secret', '');
-
-        $this->cloudinary = new Cloudinary([
-            'cloud' => [
-                'cloud_name' => $this->cloudName,
-                'api_key' => $apiKey,
-                'api_secret' => $apiSecret,
-            ],
-            'url' => [
-                'secure' => true,
-            ],
-        ]);
+        $this->apiKey = config('services.cloudinary.api_key', '');
+        $this->apiSecret = config('services.cloudinary.api_secret', '');
     }
 
     public function isConfigured(): bool
     {
-        return !empty($this->cloudName);
+        return !empty($this->cloudName) && !empty($this->apiKey) && !empty($this->apiSecret);
     }
 
     /**
-     * Upload a file to Cloudinary.
+     * Upload a file to Cloudinary using their REST API.
      */
     public function upload(UploadedFile $file, array $options = []): ?array
     {
@@ -47,18 +35,37 @@ class CloudinaryService
         }
 
         try {
-            $uploadApi = new UploadApi();
-            $tempPath = $file->getRealPath();
-
+            $timestamp = time();
             $defaultOptions = [
                 'folder' => 'tam-uploads',
-                'resource_type' => 'auto',
-                'overwrite' => false,
-                'unique_filename' => true,
-                'use_filename' => false,
+                'timestamp' => $timestamp,
+                'api_key' => $this->apiKey,
             ];
 
-            $result = $uploadApi->upload($tempPath, array_merge($defaultOptions, $options));
+            $params = array_merge($defaultOptions, $options);
+            if (isset($params['public_id'])) {
+                $params['public_id'] = $params['public_id'];
+            }
+
+            // Generate signature
+            $params['signature'] = $this->generateSignature($params, $timestamp);
+
+            // Build multipart request
+            $response = Http::attach(
+                'file',
+                file_get_contents($file->getRealPath()),
+                $file->getClientOriginalName()
+            )->post("https://api.cloudinary.com/v1_1/{$this->cloudName}/auto/upload", $params);
+
+            if (!$response->successful()) {
+                Log::error('Cloudinary upload failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $result = $response->json();
 
             return [
                 'public_id' => $result['public_id'] ?? null,
@@ -71,7 +78,7 @@ class CloudinaryService
                 'original_filename' => $file->getClientOriginalName(),
             ];
         } catch (\Throwable $e) {
-            Log::error('Cloudinary upload failed', [
+            Log::error('Cloudinary upload exception', [
                 'error' => $e->getMessage(),
                 'file' => $file->getClientOriginalName(),
             ]);
@@ -89,9 +96,20 @@ class CloudinaryService
         }
 
         try {
-            $uploadApi = new UploadApi();
-            $uploadApi->destroy($publicId, ['resource_type' => $resourceType]);
-            return true;
+            $timestamp = time();
+            $params = [
+                'public_id' => $publicId,
+                'timestamp' => $timestamp,
+                'api_key' => $this->apiKey,
+            ];
+            $params['signature'] = $this->generateSignature($params, $timestamp);
+
+            $response = Http::post(
+                "https://api.cloudinary.com/v1_1/{$this->cloudName}/{$resourceType}/destroy",
+                $params
+            );
+
+            return $response->successful() && ($response->json()['result'] ?? '') === 'ok';
         } catch (\Throwable $e) {
             Log::error('Cloudinary delete failed', [
                 'error' => $e->getMessage(),
@@ -107,36 +125,32 @@ class CloudinaryService
     public function url(string $publicId, array $transformations = []): string
     {
         $defaults = [
-            'quality' => 'auto',
-            'fetch_format' => 'auto',
-            'crop' => 'limit',
+            'q' => 'auto',
+            'f' => 'auto',
+            'c' => 'limit',
         ];
 
-        $options = array_merge($defaults, $transformations);
+        $transforms = array_merge($defaults, $transformations);
+        $transformStr = implode(',', array_map(
+            fn ($k, $v) => "{$k}_{$v}",
+            array_keys($transforms),
+            array_values($transforms)
+        ));
 
-        return $this->cloudinary->image($publicId)
-            ->addTransformation(implode(',', array_map(
-                fn ($k, $v) => "{$k}_{$v}",
-                array_keys($options),
-                array_values($options)
-            )))
-            ->toUrl();
+        return "https://res.cloudinary.com/{$this->cloudName}/image/upload/{$transformStr}/{$publicId}";
     }
 
     /**
-     * Generate a responsive srcset URL.
+     * Generate a responsive width URL.
      */
     public function responsiveUrl(string $publicId, int $width, array $extra = []): string
     {
         return $this->url($publicId, array_merge([
-            'width' => $width,
-            'crop' => 'fill',
+            'w' => $width,
+            'c' => 'fill',
         ], $extra));
     }
 
-    /**
-     * Get the Cloudinary cloud name for building frontend URLs.
-     */
     public function getCloudName(): string
     {
         return $this->cloudName;
@@ -144,14 +158,12 @@ class CloudinaryService
 
     /**
      * Extract public_id from a Cloudinary URL.
-     * Example: https://res.cloudinary.com/dkswydvru/image/upload/v1234567/tam-uploads/abc123.jpg → tam-uploads/abc123
      */
     public function extractPublicId(string $url): ?string
     {
-        $cloudName = $this->cloudName;
-        if (!$cloudName) return null;
+        if (!$this->cloudName) return null;
 
-        $pattern = "#res\.cloudinary\.com/{$cloudName}/(image|video|raw)/upload/(?:v\d+/)?(.+?)(?:\.[a-z]+)?$#";
+        $pattern = "#res\.cloudinary\.com/{$this->cloudName}/(image|video|raw)/upload/(?:v\d+/)?(.+?)(?:\.[a-z]+)?$#";
         if (preg_match($pattern, $url, $matches)) {
             return $matches[2];
         }
@@ -167,5 +179,26 @@ class CloudinaryService
         if (str_contains($url, '/video/upload/')) return 'video';
         if (str_contains($url, '/raw/upload/')) return 'raw';
         return 'image';
+    }
+
+    /**
+     * Generate Cloudinary API signature.
+     */
+    private function generateSignature(array $params, int $timestamp): string
+    {
+        // Sort params alphabetically by key
+        ksort($params);
+
+        $toSign = '';
+        foreach ($params as $key => $value) {
+            if ($key === 'file' || $key === 'signature' || $key === 'resource_type') continue;
+            if (is_bool($value)) {
+                $value = $value ? '1' : '0';
+            }
+            $toSign .= "{$key}={$value}&";
+        }
+        $toSign = rtrim($toSign, '&');
+
+        return sha1($toSign . $this->apiSecret);
     }
 }
