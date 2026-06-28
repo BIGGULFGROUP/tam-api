@@ -13,6 +13,7 @@ class SiteSettingController extends Controller
     private const ALLOWED = [
         'site_name', 'tagline', 'og_image_url',
         'social_youtube_url', 'social_instagram_url', 'social_x_url', 'social_tiktok_url',
+        'social_facebook_url', 'social_linkedin_url',
         'ga4_id', 'gtm_id', 'adsense_id',
         'maintenance_mode', 'comments_enabled', 'newsletter_enabled',
         'articles_enabled', 'review_workflow', 'autosave_interval',
@@ -22,6 +23,18 @@ class SiteSettingController extends Controller
         'youtube_api_key', 'shorts_autofetch_enabled',
         'shorts_autofetch_interval_hours', 'max_shorts_per_channel', 'auto_publish_fetched',
         'permalink_structure', 'ad_placements',
+        // Facebook / Instagram
+        'facebook_app_id', 'facebook_app_secret', 'facebook_page_id',
+        'facebook_page_token', 'facebook_token_expires_at',
+        'facebook_fetch_enabled', 'facebook_fetch_interval_hours',
+        'facebook_content_filter', 'facebook_auto_refresh_token',
+        // TikTok
+        'tiktok_client_key', 'tiktok_client_secret', 'tiktok_access_token',
+        'tiktok_token_expires_at', 'tiktok_open_id',
+        'tiktok_fetch_enabled', 'tiktok_fetch_interval_hours',
+        // YouTube Shorts extended
+        'youtube_shorts_fetch_enabled', 'youtube_shorts_auto_link',
+        'youtube_match_confidence_threshold',
     ];
 
     public function show(): JsonResponse

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Admin\YoutubeController;
 use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\Admin\PushNotificationController;
+use App\Http\Controllers\Api\Admin\SocialClipController;
 use App\Http\Controllers\Api\ContributorApplicationController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\CommentController as PublicCommentController;
@@ -101,6 +102,16 @@ Route::prefix('public')->group(function () {
 
     // Sponsored content (public)
     Route::get('sponsored', [SponsoredContentController::class, 'index']);
+
+    // Social clips (public)
+    Route::get('clips', [PublicSiteController::class, 'clips']);
+    Route::get('clips/{id}', [PublicSiteController::class, 'clipById']);
+
+    // Comments for clips
+    Route::get('clips/{id}/comments', [PublicCommentController::class, 'threaded']);
+    Route::middleware('throttle:comments')->group(function () {
+        Route::post('clips/{id}/comments', [PublicCommentController::class, 'submitClip']);
+    });
 });
 
 $frontendDomain = config('admin-access.frontend_domain');
@@ -158,6 +169,7 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
             Route::get('comments', [CommentController::class, 'index']);
             Route::patch('comments/{id}', [CommentController::class, 'update']);
             Route::delete('comments/{id}', [CommentController::class, 'destroy']);
+            Route::post('comments/bulk', [CommentController::class, 'bulkAction']);
 
             Route::get('media', [MediaController::class, 'index']);
             Route::post('media/upload', [MediaController::class, 'upload']);
@@ -238,6 +250,29 @@ $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
 
             Route::get('push/status', [PushNotificationController::class, 'status']);
             Route::post('push/send', [PushNotificationController::class, 'send']);
+
+            // Social clips management
+            Route::get('social-clips', [SocialClipController::class, 'index']);
+            Route::get('social-clips/stats', [SocialClipController::class, 'stats']);
+            Route::get('social-clips/search-videos', [SocialClipController::class, 'searchVideos']);
+            Route::get('social-clips/{id}', [SocialClipController::class, 'show']);
+            Route::post('social-clips/{id}/link', [SocialClipController::class, 'link']);
+            Route::post('social-clips/{id}/unlink', [SocialClipController::class, 'unlink']);
+            Route::post('social-clips/{id}/confirm', [SocialClipController::class, 'confirmAutoMap']);
+            Route::post('social-clips/bulk', [SocialClipController::class, 'bulkAction']);
+
+            // Facebook Reels fetch
+            Route::get('social/facebook/status', [SocialClipController::class, 'facebookStatus']);
+            Route::post('social/facebook/fetch', [SocialClipController::class, 'facebookFetch']);
+            Route::post('social/facebook/refresh-token', [SocialClipController::class, 'facebookRefreshToken']);
+
+            // TikTok fetch
+            Route::get('social/tiktok/status', [SocialClipController::class, 'tiktokStatus']);
+            Route::post('social/tiktok/fetch', [SocialClipController::class, 'tiktokFetch']);
+
+            // YouTube Shorts extended
+            Route::post('youtube/shorts/auto-link', [YoutubeController::class, 'autoLinkShorts']);
+            Route::post('youtube/shorts/sync-clips', [YoutubeController::class, 'syncShortsAsClips']);
         });
     });
 });

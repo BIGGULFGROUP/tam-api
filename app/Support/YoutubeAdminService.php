@@ -838,6 +838,193 @@ class YoutubeAdminService
         return Str::slug($input, '-');
     }
 
+    /**
+     * Run fuzzy title matching to auto-link YouTube Shorts to full-length videos.
+     */
+    public function autoLinkShorts(): array
+    {
+        $settings = SiteSetting::query()->find(1);
+        if (! ($settings->youtube_shorts_auto_link ?? false)) {
+            return ['linked' => 0, 'message' => 'Auto-link is disabled in settings.'];
+        }
+
+        $threshold = ($settings->youtube_match_confidence_threshold ?? 70) / 100;
+
+        // Find unlinked YouTube Shorts stored in videos table
+        $shorts = Video::where('content_type', 'short')
+            ->where('status', 'published')
+            ->whereNotNull('title')
+            ->get();
+
+        // Also check social_clips for unlinked YouTube shorts
+        $unlinkedClips = SocialClip::where('platform', 'youtube')
+            ->whereIn('mapping_status', ['unlinked', 'auto_mapped'])
+            ->get();
+
+        $linked = 0;
+
+        foreach ($shorts as $short) {
+            $shortTitle = $this->normalizeForMatching($short->title);
+
+            $candidates = Video::where('content_type', 'video')
+                ->where('status', 'published')
+                ->where('niche', $short->niche)
+                ->where('id', '!=', $short->id)
+                ->whereNotNull('title')
+                ->get();
+
+            $bestMatch = null;
+            $bestScore = 0;
+
+            foreach ($candidates as $candidate) {
+                $candidateTitle = $this->normalizeForMatching($candidate->title);
+                $score = $this->titleSimilarity($shortTitle, $candidateTitle);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestMatch = $candidate;
+                }
+            }
+
+            if ($bestMatch && $bestScore >= $threshold) {
+                $status = $bestScore >= 0.85 ? 'confirmed' : 'auto_mapped';
+                SocialClip::updateOrCreate(
+                    ['platform' => 'youtube', 'external_clip_id' => $short->youtube_id ?? $short->id],
+                    [
+                        'title' => $short->title,
+                        'caption' => $short->description,
+                        'thumbnail_url' => $short->thumbnail_url,
+                        'clip_url' => 'https://youtube.com/watch?v=' . ($short->youtube_id ?? ''),
+                        'embed_url' => 'https://www.youtube.com/embed/' . ($short->youtube_id ?? ''),
+                        'duration_seconds' => $short->duration ? $this->parseDurationSeconds($short->duration) : null,
+                        'fetched_at' => now(),
+                        'published_at' => $short->published_at,
+                        'platform_metadata' => ['content_id' => $short->id],
+                        'linked_video_id' => $bestMatch->id,
+                        'mapping_status' => $status,
+                        'match_confidence' => round($bestScore * 100, 2),
+                    ]
+                );
+                $linked++;
+            }
+        }
+
+        foreach ($unlinkedClips as $clip) {
+            if (! $clip->title) continue;
+            $clipTitle = $this->normalizeForMatching($clip->title);
+
+            $candidates = Video::where('content_type', 'video')
+                ->where('status', 'published')
+                ->whereNotNull('title')
+                ->get();
+
+            $bestMatch = null;
+            $bestScore = 0;
+
+            foreach ($candidates as $candidate) {
+                $candidateTitle = $this->normalizeForMatching($candidate->title);
+                $score = $this->titleSimilarity($clipTitle, $candidateTitle);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestMatch = $candidate;
+                }
+            }
+
+            if ($bestMatch && $bestScore >= $threshold) {
+                $status = $bestScore >= 0.85 ? 'confirmed' : 'auto_mapped';
+                $clip->update([
+                    'linked_video_id' => $bestMatch->id,
+                    'mapping_status' => $status,
+                    'match_confidence' => round($bestScore * 100, 2),
+                ]);
+                $linked++;
+            }
+        }
+
+        return ['linked' => $linked, 'threshold' => $threshold * 100];
+    }
+
+    /**
+     * Fetch and store YouTube Shorts as social clips entries.
+     */
+    public function fetchShortsAsClips(int $maxResults = 20): array
+    {
+        $settings = SiteSetting::query()->find(1);
+        if (! ($settings->youtube_shorts_fetch_enabled ?? false)) {
+            return ['error' => 'YouTube Shorts fetch is disabled', 'status' => 400, 'imported' => 0];
+        }
+
+        $shorts = Video::where('content_type', 'short')
+            ->where('status', 'published')
+            ->orderBy('published_at', 'desc')
+            ->limit($maxResults)
+            ->get();
+
+        $imported = 0;
+
+        foreach ($shorts as $short) {
+            $youtubeId = $short->youtube_id;
+            if (! $youtubeId) continue;
+
+            $exists = SocialClip::where('platform', 'youtube')
+                ->where('external_clip_id', $youtubeId)
+                ->exists();
+
+            if ($exists) continue;
+
+            SocialClip::create([
+                'platform' => 'youtube',
+                'external_clip_id' => $youtubeId,
+                'title' => $short->title,
+                'caption' => $short->description,
+                'thumbnail_url' => $short->thumbnail_url,
+                'clip_url' => 'https://youtube.com/shorts/' . $youtubeId,
+                'embed_url' => 'https://www.youtube.com/embed/' . $youtubeId,
+                'duration_seconds' => $short->duration ? $this->parseDurationSeconds($short->duration) : null,
+                'fetched_at' => now(),
+                'published_at' => $short->published_at,
+                'platform_metadata' => ['content_id' => $short->id, 'niche' => $short->niche],
+                'mapping_status' => 'unlinked',
+            ]);
+
+            $imported++;
+        }
+
+        return ['imported' => $imported, 'total_shorts' => $shorts->count(), 'status' => 200];
+    }
+
+    private function normalizeForMatching(string $title): string
+    {
+        $normalized = mb_strtolower(trim($title));
+        $normalized = preg_replace('/[#＃]shorts?/i', '', $normalized);
+        $normalized = preg_replace('/\(shorts?\)/i', '', $normalized);
+        $normalized = preg_replace('/\[shorts?\]/i', '', $normalized);
+        $normalized = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $normalized);
+        $normalized = preg_replace('/\s+/', ' ', $normalized);
+        return trim($normalized);
+    }
+
+    private function titleSimilarity(string $a, string $b): float
+    {
+        if ($a === '' || $b === '') return 0;
+        if ($a === $b) return 1.0;
+
+        $wordsA = array_unique(array_filter(explode(' ', $a)));
+        $wordsB = array_unique(array_filter(explode(' ', $b)));
+
+        if (empty($wordsA) || empty($wordsB)) return 0;
+
+        $intersection = array_intersect($wordsA, $wordsB);
+        $union = array_unique(array_merge($wordsA, $wordsB));
+
+        $jaccard = count($intersection) / count($union);
+
+        $lev = levenshtein($a, $b);
+        $maxLen = max(mb_strlen($a), mb_strlen($b));
+        $levRatio = $maxLen > 0 ? 1 - ($lev / $maxLen) : 0;
+
+        return ($jaccard * 0.6) + ($levRatio * 0.4);
+    }
+
     private function logFetch(array $payload): void
     {
         YoutubeFetchLog::query()->create($payload);

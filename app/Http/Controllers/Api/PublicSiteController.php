@@ -836,4 +836,69 @@ class PublicSiteController extends Controller
         return response()->json(['items' => $svc->getForUser($user->id, 10)]);
     }
 
+    public function clips(Request $request): JsonResponse
+    {
+        $limit = min(100, max(1, (int) $request->query('limit', 30)));
+        $platform = $request->query('platform');
+
+        $query = \App\Models\SocialClip::query()
+            ->with('linkedVideo:id,title,slug,niche,thumbnail_url')
+            ->orderByDesc('fetched_at')
+            ->limit($limit);
+
+        if ($platform && in_array($platform, ['youtube', 'facebook', 'tiktok'])) {
+            $query->where('platform', $platform);
+        }
+
+        $clips = $query->get()->map(function ($clip) {
+            return [
+                'id' => $clip->id,
+                'platform' => $clip->platform,
+                'title' => $clip->title,
+                'caption' => $clip->caption,
+                'thumbnail_url' => $clip->thumbnail_url,
+                'clip_url' => $clip->clip_url,
+                'embed_url' => $clip->embed_url,
+                'duration_seconds' => $clip->duration_seconds,
+                'published_at' => $clip->published_at?->toIso8601String(),
+                'linked_video' => $clip->linkedVideo ? [
+                    'id' => $clip->linkedVideo->id,
+                    'title' => $clip->linkedVideo->title,
+                    'slug' => $clip->linkedVideo->slug,
+                    'niche' => $clip->linkedVideo->niche,
+                    'thumbnail_url' => $clip->linkedVideo->thumbnail_url,
+                ] : null,
+                'mapping_status' => $clip->mapping_status,
+            ];
+        });
+
+        return response()->json(['data' => $clips]);
+    }
+
+    public function clipById(string $id): JsonResponse
+    {
+        $clip = \App\Models\SocialClip::with('linkedVideo:id,title,slug,niche,thumbnail_url')->findOrFail($id);
+
+        return response()->json([
+            'id' => $clip->id,
+            'platform' => $clip->platform,
+            'title' => $clip->title,
+            'caption' => $clip->caption,
+            'thumbnail_url' => $clip->thumbnail_url,
+            'clip_url' => $clip->clip_url,
+            'embed_url' => $clip->embed_url,
+            'duration_seconds' => $clip->duration_seconds,
+            'published_at' => $clip->published_at?->toIso8601String(),
+            'platform_metadata' => $clip->platform_metadata,
+            'linked_video' => $clip->linkedVideo ? [
+                'id' => $clip->linkedVideo->id,
+                'title' => $clip->linkedVideo->title,
+                'slug' => $clip->linkedVideo->slug,
+                'niche' => $clip->linkedVideo->niche,
+                'thumbnail_url' => $clip->linkedVideo->thumbnail_url,
+            ] : null,
+            'mapping_status' => $clip->mapping_status,
+        ]);
+    }
+
 }

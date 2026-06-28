@@ -134,4 +134,19 @@ class YoutubeController extends Controller
 
         return $secret !== '' && hash_equals($secret, (string) $request->header('x-cron-secret', ''));
     }
+
+    public function autoLinkShorts(Request $request): JsonResponse
+    {
+        $this->assertCanConfigure($request);
+        $result = $this->youtube->autoLinkShorts();
+        return response()->json($result);
+    }
+
+    public function syncShortsAsClips(Request $request): JsonResponse
+    {
+        $this->assertCanConfigure($request);
+        $maxResults = (int) $request->input('max_results', 20);
+        $result = $this->youtube->fetchShortsAsClips(min($maxResults, 50));
+        return response()->json($result, (int) ($result['status'] ?? 200));
+    }
 }

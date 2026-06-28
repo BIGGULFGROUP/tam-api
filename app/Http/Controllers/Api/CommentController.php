@@ -16,11 +16,29 @@ class CommentController extends Controller
     public function threaded(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'content_id' => ['required', 'uuid', 'exists:videos,id'],
+            'content_id' => ['required', 'uuid'],
+            'content_type' => ['sometimes', 'string', 'in:video,clip'],
         ]);
+
+        $contentType = $data['content_type'] ?? 'video';
+
+        if ($contentType === 'clip') {
+            // Validate clip exists
+            $exists = DB::table('social_clips')->where('id', $data['content_id'])->exists();
+            if (! $exists) {
+                return response()->json(['error' => 'Clip not found'], 404);
+            }
+        } else {
+            // Validate video exists (existing behavior)
+            $exists = DB::table('videos')->where('id', $data['content_id'])->exists();
+            if (! $exists) {
+                return response()->json(['error' => 'Content not found'], 404);
+            }
+        }
 
         $comments = DB::table('comments')
             ->where('content_id', $data['content_id'])
+            ->where('content_type', $contentType)
             ->where('is_approved', true)
             ->orderBy('upvotes', 'desc')
             ->orderBy('created_at', 'asc')
@@ -71,6 +89,7 @@ class CommentController extends Controller
 
         DB::table('comments')->insert([
             'id' => $id,
+            'content_type' => 'video',
             'content_id' => $data['content_id'],
             'parent_id' => $data['parent_id'] ?? null,
             'author_name' => $data['author_name'],
@@ -146,5 +165,53 @@ class CommentController extends Controller
         DB::table('comments')->where('id', $id)->increment('upvotes');
 
         return response()->json(['upvoted' => true, 'upvotes' => DB::table('comments')->where('id', $id)->value('upvotes')]);
+    }
+
+    /**
+     * Submit a comment on a social clip.
+     */
+    public function submitClip(Request $request, string $clipId): JsonResponse
+    {
+        $clip = DB::table('social_clips')->where('id', $clipId)->first();
+        if (! $clip) {
+            return response()->json(['error' => 'Clip not found'], 404);
+        }
+
+        $data = $request->validate([
+            'author_name' => ['required', 'string', 'max:120'],
+            'author_email' => ['nullable', 'email', 'max:255'],
+            'body' => ['required', 'string', 'max:2000'],
+            'parent_id' => ['nullable', 'uuid', 'exists:comments,id'],
+        ]);
+
+        $id = Str::uuid();
+
+        DB::table('comments')->insert([
+            'id' => $id,
+            'content_type' => 'clip',
+            'content_id' => $clipId,
+            'parent_id' => $data['parent_id'] ?? null,
+            'author_name' => $data['author_name'],
+            'author_email' => $data['author_email'] ?? null,
+            'body' => strip_tags($data['body']),
+            'is_approved' => true,
+            'is_spam' => false,
+            'ip_address' => $request->ip(),
+            'upvotes' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'comment' => [
+                'id' => $id,
+                'parent_id' => $data['parent_id'] ?? null,
+                'author_name' => $data['author_name'],
+                'body' => strip_tags($data['body']),
+                'upvotes' => 0,
+                'created_at' => now()->toISOString(),
+            ],
+        ], 201);
     }
 }
