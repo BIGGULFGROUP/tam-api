@@ -12,7 +12,10 @@ use App\Models\NewsletterPopupTemplate;
 use App\Models\NewsletterSubscriber;
 use App\Models\SiteSetting;
 use App\Models\Tag;
+use App\Models\PageView;
 use App\Models\Video;
+use App\Services\IpGeolocationService;
+use App\Services\UserAgentParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -145,6 +148,50 @@ class PublicSiteController extends Controller
         }
 
         $video->increment('views');
+
+        // Record page view with geo + device analytics
+        $ip = $request->ip();
+        $geo = app(IpGeolocationService::class)->resolve($ip);
+        $ua = app(UserAgentParser::class)->parse($request->userAgent());
+
+        PageView::query()->create([
+            'path'         => $request->input('path', '/'),
+            'referrer'     => $request->input('referrer'),
+            'user_agent'   => $request->userAgent(),
+            'ip_address'   => $ip,
+            'country_code' => $geo['code'],
+            'country_name' => $geo['name'],
+            'device_type'  => $ua['device_type'],
+            'browser'      => $ua['browser'],
+            'os'           => $ua['os'],
+            'content_id'   => $data['contentId'],
+        ]);
+
+        return response()->json(['recorded' => true]);
+    }
+
+    public function recordPageView(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'path'     => ['nullable', 'string', 'max:2048'],
+            'referrer' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        $ip = $request->ip();
+        $geo = app(IpGeolocationService::class)->resolve($ip);
+        $ua = app(UserAgentParser::class)->parse($request->userAgent());
+
+        PageView::query()->create([
+            'path'         => $data['path'] ?? '/',
+            'referrer'     => $data['referrer'] ?? $request->header('Referer'),
+            'user_agent'   => $request->userAgent(),
+            'ip_address'   => $ip,
+            'country_code' => $geo['code'],
+            'country_name' => $geo['name'],
+            'device_type'  => $ua['device_type'],
+            'browser'      => $ua['browser'],
+            'os'           => $ua['os'],
+        ]);
 
         return response()->json(['recorded' => true]);
     }

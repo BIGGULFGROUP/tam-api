@@ -7,10 +7,12 @@ use App\Models\Comment;
 use App\Models\NewsletterPopupEvent;
 use App\Models\NewsletterPopupTemplate;
 use App\Models\NewsletterSubscriber;
+use App\Models\PageView;
 use App\Models\UserReadEvent;
 use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AnalyticsController extends Controller
 {
@@ -87,6 +89,60 @@ class AnalyticsController extends Controller
             ->filter(fn ($c) => isset($countryConfig[$c['code']]))
             ->values();
 
+        // Page view stats
+        $totalPageViews = PageView::query()->where('created_at', '>=', $since)->count();
+
+        $dailyViews = PageView::query()
+            ->where('created_at', '>=', $since)
+            ->selectRaw("DATE(created_at) as date, count(*) as count")
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get()
+            ->map(fn ($r) => ['date' => $r->date, 'count' => (int) $r->count])
+            ->values();
+
+        $topPages = PageView::query()
+            ->where('created_at', '>=', $since)
+            ->selectRaw('path, count(*) as views')
+            ->groupBy('path')
+            ->orderByDesc('views')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => ['path' => $r->path, 'views' => (int) $r->views])
+            ->values();
+
+        $deviceBreakdown = PageView::query()
+            ->where('created_at', '>=', $since)
+            ->selectRaw('device_type, count(*) as count')
+            ->groupBy('device_type')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->device_type => (int) $r->count]);
+
+        $sourceBreakdown = PageView::query()
+            ->where('created_at', '>=', $since)
+            ->selectRaw(
+                "CASE WHEN referrer IS NULL OR referrer = '' THEN 'direct' " .
+                "WHEN referrer LIKE '%google.%' OR referrer LIKE '%bing.%' OR referrer LIKE '%yahoo.%' OR referrer LIKE '%duckduckgo.%' THEN 'search' " .
+                "WHEN referrer LIKE '%facebook.%' OR referrer LIKE '%twitter.%' OR referrer LIKE '%x.com%' OR referrer LIKE '%instagram.%' OR referrer LIKE '%linkedin.%' OR referrer LIKE '%reddit.%' OR referrer LIKE '%tiktok.%' OR referrer LIKE '%youtube.%' THEN 'social' " .
+                "ELSE 'other' END as source, count(*) as count"
+            )
+            ->groupBy('source')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->source => (int) $r->count]);
+
+        $deviceData = [
+            'desktop' => $deviceBreakdown['desktop'] ?? 0,
+            'mobile'  => $deviceBreakdown['mobile'] ?? 0,
+            'tablet'  => $deviceBreakdown['tablet'] ?? 0,
+        ];
+
+        $sourceData = [
+            'direct' => $sourceBreakdown['direct'] ?? 0,
+            'search' => $sourceBreakdown['search'] ?? 0,
+            'social' => $sourceBreakdown['social'] ?? 0,
+            'other'  => $sourceBreakdown['other'] ?? 0,
+        ];
+
         return response()->json([
             'provider'    => 'internal',
             'generatedAt' => now()->toISOString(),
@@ -97,6 +153,7 @@ class AnalyticsController extends Controller
                 'draftPosts'     => $drafts,
                 'subscribers'    => $subscribers,
                 'comments'       => $comments,
+                'pageViews'      => $totalPageViews,
             ],
             'countries' => $countries,
             'topContent' => $videos->take(8)->map(fn ($v) => [
@@ -108,6 +165,13 @@ class AnalyticsController extends Controller
                 'status'    => $v->status,
                 'updatedAt' => $v->updated_at,
             ]),
+            'pageViews' => [
+                'total'    => $totalPageViews,
+                'daily'    => $dailyViews,
+                'topPages' => $topPages,
+                'devices'  => $deviceData,
+                'sources'  => $sourceData,
+            ],
             'popup' => array_merge($popupOverview, [
                 'days'                => $days,
                 'conversionRate'      => $convRate($popupOverview['submits'], $popupOverview['impressions']),

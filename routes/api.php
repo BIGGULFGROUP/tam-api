@@ -62,6 +62,7 @@ Route::prefix('public')->group(function () {
 
     Route::middleware('throttle:content-view')->group(function () {
         Route::post('content/view', [PublicSiteController::class, 'recordView']);
+        Route::post('analytics/pageview', [PublicSiteController::class, 'recordPageView']);
     });
 
     // Web push subscription
