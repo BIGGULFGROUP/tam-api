@@ -9,6 +9,7 @@ use App\Models\UserNotificationPreference;
 use App\Models\UserNotificationRead;
 use App\Models\UserReadEvent;
 use App\Models\Video;
+use App\Services\IpGeolocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -119,12 +120,18 @@ class AccountController extends Controller
             'niche' => ['nullable', 'string', 'max:80'],
         ]);
 
+        $ip = $request->ip();
+        $geo = app(IpGeolocationService::class)->resolve($ip);
+
         UserReadEvent::query()->create([
             'user_id' => $admin->id,
             'content_id' => $data['contentId'],
             'slug' => $data['slug'] ?? null,
             'niche' => $data['niche'] ?? null,
             'viewed_at' => now(),
+            'ip_address' => $ip,
+            'country_code' => $geo['code'],
+            'country_name' => $geo['name'],
         ]);
 
         UserNotificationRead::query()->upsert([

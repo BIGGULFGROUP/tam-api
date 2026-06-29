@@ -13,6 +13,9 @@ class UserReadEvent extends Model
         'slug',
         'niche',
         'viewed_at',
+        'ip_address',
+        'country_code',
+        'country_name',
     ];
 
     protected function casts(): array

@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * Country coordinate map for the analytics world map.
+ * lat/lon pairs used by jsvectormap markers on the frontend.
+ */
+return [
+    'NG' => ['name' => 'Nigeria',       'coords' => [9.082, 8.675]],
+    'ZA' => ['name' => 'South Africa',  'coords' => [-30.559, 22.938]],
+    'KE' => ['name' => 'Kenya',         'coords' => [-1.292, 36.822]],
+    'GH' => ['name' => 'Ghana',         'coords' => [7.946, -1.023]],
+    'EG' => ['name' => 'Egypt',         'coords' => [26.821, 30.802]],
+    'ET' => ['name' => 'Ethiopia',      'coords' => [9.145, 40.490]],
+    'MA' => ['name' => 'Morocco',       'coords' => [31.792, -7.093]],
+    'SN' => ['name' => 'Senegal',       'coords' => [14.497, -14.452]],
+    'TZ' => ['name' => 'Tanzania',      'coords' => [-6.369, 34.889]],
+    'US' => ['name' => 'United States', 'coords' => [37.090, -95.713]],
+    'GB' => ['name' => 'United Kingdom','coords' => [55.378, -3.436]],
+    'IN' => ['name' => 'India',         'coords' => [20.594, 78.963]],
+    'CA' => ['name' => 'Canada',        'coords' => [56.130, -106.347]],
+    'AU' => ['name' => 'Australia',     'coords' => [-25.274, 133.775]],
+    'DE' => ['name' => 'Germany',       'coords' => [51.166, 10.452]],
+    'FR' => ['name' => 'France',        'coords' => [46.228, 2.214]],
+    'BR' => ['name' => 'Brazil',        'coords' => [-14.235, -51.925]],
+    'AE' => ['name' => 'UAE',           'coords' => [23.424, 53.848]],
+    'SA' => ['name' => 'Saudi Arabia',  'coords' => [23.886, 45.079]],
+    'PK' => ['name' => 'Pakistan',      'coords' => [30.375, 69.345]],
+    'BD' => ['name' => 'Bangladesh',    'coords' => [23.685, 90.356]],
+    'ID' => ['name' => 'Indonesia',     'coords' => [-0.789, 113.921]],
+    'PH' => ['name' => 'Philippines',   'coords' => [12.880, 121.774]],
+    'MY' => ['name' => 'Malaysia',      'coords' => [4.210, 101.976]],
+    'SG' => ['name' => 'Singapore',     'coords' => [1.352, 103.820]],
+    'JP' => ['name' => 'Japan',         'coords' => [36.205, 138.253]],
+    'KR' => ['name' => 'South Korea',   'coords' => [35.908, 127.767]],
+    'CN' => ['name' => 'China',         'coords' => [35.862, 104.195]],
+    'NL' => ['name' => 'Netherlands',   'coords' => [52.133, 5.291]],
+    'IT' => ['name' => 'Italy',         'coords' => [41.872, 12.567]],
+    'ES' => ['name' => 'Spain',         'coords' => [40.464, -3.749]],
+    'PT' => ['name' => 'Portugal',      'coords' => [39.400, -8.224]],
+    'SE' => ['name' => 'Sweden',        'coords' => [60.128, 18.644]],
+    'NO' => ['name' => 'Norway',        'coords' => [60.472, 8.469]],
+    'DK' => ['name' => 'Denmark',       'coords' => [56.264, 9.502]],
+    'PL' => ['name' => 'Poland',        'coords' => [51.919, 19.145]],
+    'UA' => ['name' => 'Ukraine',       'coords' => [48.379, 31.166]],
+    'TR' => ['name' => 'Turkey',        'coords' => [38.964, 35.243]],
+    'IR' => ['name' => 'Iran',          'coords' => [32.428, 53.688]],
+    'IQ' => ['name' => 'Iraq',          'coords' => [33.223, 43.679]],
+];

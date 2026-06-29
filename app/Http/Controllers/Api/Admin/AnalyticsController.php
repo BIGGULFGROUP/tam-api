@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Models\NewsletterPopupEvent;
 use App\Models\NewsletterPopupTemplate;
 use App\Models\NewsletterSubscriber;
+use App\Models\UserReadEvent;
 use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,30 @@ class AnalyticsController extends Controller
             ->map(fn ($c) => array_merge($c, ['conversionRate' => $convRate($c['submits'], $c['impressions'])]))
             ->sortByDesc('submits')->take(8)->values();
 
+        $countryConfig = config('countries');
+        $countryRows = UserReadEvent::query()
+            ->where('viewed_at', '>=', $since)
+            ->whereNotNull('country_code')
+            ->whereNotNull('country_name')
+            ->selectRaw('country_code, country_name, count(*) as views')
+            ->groupBy('country_code', 'country_name')
+            ->orderByDesc('views')
+            ->get();
+
+        $countries = $countryRows
+            ->map(function ($row) use ($countryConfig) {
+                $code = strtoupper($row->country_code);
+                $meta = $countryConfig[$code] ?? null;
+                return [
+                    'code'   => $code,
+                    'name'   => $row->country_name,
+                    'coords' => $meta['coords'] ?? [0, 0],
+                    'views'  => (int) $row->views,
+                ];
+            })
+            ->filter(fn ($c) => isset($countryConfig[$c['code']]))
+            ->values();
+
         return response()->json([
             'provider'    => 'internal',
             'generatedAt' => now()->toISOString(),
@@ -73,6 +98,7 @@ class AnalyticsController extends Controller
                 'subscribers'    => $subscribers,
                 'comments'       => $comments,
             ],
+            'countries' => $countries,
             'topContent' => $videos->take(8)->map(fn ($v) => [
                 'id'        => $v->id,
                 'title'     => $v->title,
