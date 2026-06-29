@@ -10,6 +10,7 @@ use App\Models\NewsletterSubscriber;
 use App\Models\PageView;
 use App\Models\UserReadEvent;
 use App\Models\Video;
+use App\Services\YoutubeAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -143,6 +144,8 @@ class AnalyticsController extends Controller
             'other'  => $sourceBreakdown['other'] ?? 0,
         ];
 
+        $youtube = app(YoutubeAnalyticsService::class)->aggregate();
+
         return response()->json([
             'provider'    => 'internal',
             'generatedAt' => now()->toISOString(),
@@ -172,6 +175,7 @@ class AnalyticsController extends Controller
                 'devices'  => $deviceData,
                 'sources'  => $sourceData,
             ],
+            'youtube' => $youtube,
             'popup' => array_merge($popupOverview, [
                 'days'                => $days,
                 'conversionRate'      => $convRate($popupOverview['submits'], $popupOverview['impressions']),
