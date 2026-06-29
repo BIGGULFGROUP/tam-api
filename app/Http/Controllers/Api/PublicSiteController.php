@@ -255,6 +255,9 @@ class PublicSiteController extends Controller
         $email = Str::lower(trim($data['email']));
         $categories = array_values(array_unique(array_filter($data['categories'] ?? [])));
 
+        // Fire-and-forget Brevo sync (must run before response to not be skipped)
+        $this->syncToBrevo($email, $data['name'] ?? null, $categories);
+
         $subscriber = NewsletterSubscriber::query()->where('email', $email)->first();
         if ($subscriber) {
             $merged = array_values(array_unique(array_merge($subscriber->niches ?? [], $categories)));
@@ -288,9 +291,6 @@ class PublicSiteController extends Controller
             'success' => true,
             'message' => 'Subscribed successfully!',
         ]);
-
-        // Sync to Brevo
-        $this->syncToBrevo($email, $data['name'] ?? null, $categories);
     }
 
     private function syncToBrevo(string $email, ?string $name, array $niches): void
