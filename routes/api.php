@@ -8,9 +8,6 @@ use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\TagController;
 use App\Http\Controllers\Api\Admin\CommentController;
 use App\Http\Controllers\Api\Admin\MediaController;
-use App\Http\Controllers\Api\Admin\NewsletterSubscriberController;
-use App\Http\Controllers\Api\Admin\NewsletterCampaignController;
-use App\Http\Controllers\Api\Admin\NewsletterPopupController;
 use App\Http\Controllers\Api\Admin\ContentSubmissionController;
 use App\Http\Controllers\Api\Admin\SiteSettingController;
 use App\Http\Controllers\Api\Admin\AnalyticsController;
@@ -43,21 +40,12 @@ Route::prefix('public')->group(function () {
     Route::get('authors/{id}', [PublicSiteController::class, 'authorById']);
     Route::get('site/settings', [PublicSiteController::class, 'siteSettings']);
     Route::get('comments', [PublicSiteController::class, 'comments']);
-    Route::get('newsletters', [PublicSiteController::class, 'newsletters']);
-    Route::get('newsletter/popup-config', [PublicSiteController::class, 'popupConfig']);
-
     // Rate-limited POST endpoints
     // Comments (threaded + upvotable)
     Route::get('comments/threaded', [PublicCommentController::class, 'threaded']);
     Route::middleware('throttle:comments')->group(function () {
         Route::post('comments', [PublicCommentController::class, 'submit']);
         Route::post('comments/{id}/upvote', [PublicCommentController::class, 'upvote']);
-    });
-
-    Route::middleware('throttle:newsletter')->group(function () {
-        Route::post('newsletter', [PublicSiteController::class, 'subscribeNewsletter']);
-        Route::post('newsletter/popup-event', [PublicSiteController::class, 'popupEvent']);
-        Route::post('newsletter/banner-event', [PublicSiteController::class, 'popupEvent']);
     });
 
     Route::middleware('throttle:content-view')->group(function () {
@@ -197,7 +185,6 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
                 Route::post('activity/read', [AccountController::class, 'recordActivityRead']);
                 Route::get('readership/weekly', [AccountController::class, 'weeklyReadership']);
                 Route::match(['get', 'put'], 'preferences/notifications', [AccountController::class, 'notificationPreferences']);
-                Route::match(['get', 'put'], 'preferences/newsletter', [AccountController::class, 'newsletterPreferences']);
                 Route::post('profile/avatar', [AccountController::class, 'updateAvatar']);
             });
         });
@@ -223,18 +210,6 @@ $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
             Route::delete('users/{id}', [AdminProfileController::class, 'destroy']);
             Route::patch('users/{id}/password', [AdminProfileController::class, 'updatePassword']);
             Route::get('users/{id}/content', [AdminProfileController::class, 'content']);
-
-            Route::get('subscribers', [NewsletterSubscriberController::class, 'index']);
-            Route::get('subscribers/export', [NewsletterSubscriberController::class, 'export']);
-
-            Route::get('newsletters', [NewsletterCampaignController::class, 'index']);
-            Route::post('newsletters', [NewsletterCampaignController::class, 'store']);
-            Route::patch('newsletters', [NewsletterCampaignController::class, 'update']);
-            Route::delete('newsletters', [NewsletterCampaignController::class, 'destroy']);
-
-            Route::get('newsletter/popups', [NewsletterPopupController::class, 'index']);
-            Route::post('newsletter/popups', [NewsletterPopupController::class, 'upsert']);
-            Route::delete('newsletter/popups', [NewsletterPopupController::class, 'destroy']);
 
             Route::get('settings', [SiteSettingController::class, 'show']);
             Route::post('settings', [SiteSettingController::class, 'upsert']);

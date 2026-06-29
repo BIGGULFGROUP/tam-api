@@ -4,9 +4,6 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
-use App\Models\NewsletterPopupEvent;
-use App\Models\NewsletterPopupTemplate;
-use App\Models\NewsletterSubscriber;
 use App\Models\PageView;
 use App\Models\UserReadEvent;
 use App\Models\Video;
@@ -175,8 +172,7 @@ class AnalyticsController extends Controller
                 'devices'  => $deviceData,
                 'sources'  => $sourceData,
             ],
-            'youtube' => $youtube,
-            'popup' => array_merge($popupOverview, [
+            'youtube' => $youtube,($popupOverview, [
                 'days'                => $days,
                 'conversionRate'      => $convRate($popupOverview['submits'], $popupOverview['impressions']),
                 'templatePerformance' => $templatePerf,
