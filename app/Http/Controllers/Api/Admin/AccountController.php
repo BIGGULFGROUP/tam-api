@@ -193,4 +193,35 @@ class AccountController extends Controller
             'weeklyDigestEnabled' => $prefs->weekly_digest_enabled,
         ]);
     }
+
+    public function updateAvatar(Request $request): JsonResponse
+    {
+        /** @var AdminProfile $admin */
+        $admin = $request->user();
+        $file = $request->file('file');
+        if (! $file) {
+            return response()->json(['error' => 'No file uploaded.'], 400);
+        }
+
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+        if (! in_array($mime, self::ALLOWED_AVATAR_MIMES, true)) {
+            return response()->json(['error' => 'Unsupported image format.'], 400);
+        }
+        if ($file->getSize() > self::MAX_AVATAR_BYTES) {
+            return response()->json(['error' => 'Image must be less than 8MB.'], 413);
+        }
+
+        $disk = config('filesystems.default', 'public');
+        $safeName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
+            .'-'.$admin->id.'-'.now()->timestamp.'.'.$file->getClientOriginalExtension();
+        $path = Storage::disk($disk)->putFileAs('avatars/'.$admin->id, $file, $safeName);
+        $avatarUrl = Storage::disk($disk)->url($path);
+
+        $admin->update([
+            'avatar_url' => $avatarUrl,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['avatarUrl' => $avatarUrl]);
+    }
 }

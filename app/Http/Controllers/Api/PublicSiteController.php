@@ -233,4 +233,496 @@ class PublicSiteController extends Controller
             'message' => 'Comment submitted and awaiting moderation. Thank you!',
         ]);
     }
+
+    public function siteSettings(): JsonResponse
+    {
+        $settings = SiteSetting::query()->find(1);
+
+        return response()->json([
+            'adsenseId' => $settings?->adsense_id ?? '',
+            'permalinkStructure' => $settings?->permalink_structure ?? 'plain',
+            'socialLinks' => [
+                'youtubeUrl' => $settings?->social_youtube_url,
+                'facebookUrl' => $settings?->social_facebook_url,
+                'instagramUrl' => $settings?->social_instagram_url,
+                'linkedinUrl' => $settings?->social_linkedin_url,
+                'xUrl' => $settings?->social_x_url,
+                'tiktokUrl' => $settings?->social_tiktok_url,
+            ],
+        ]);
+    }
+
+    public function content(Request $request): JsonResponse
+    {
+        $query = Video::query();
+        $status = $request->query('status', 'published');
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $this->applyPublicContentFilters($query, $request);
+
+        if ($request->boolean('countOnly')) {
+            return response()->json(['count' => $query->count()]);
+        }
+
+        $limit = min(200, max(1, (int) $request->query('limit', 24)));
+        $offset = max(0, (int) $request->query('offset', 0));
+        $orderBy = $this->publicContentOrderBy($request->query('orderBy', 'published_at'));
+        $orderDir = in_array($request->query('orderDir', 'desc'), ['asc', 'desc'], true)
+            ? $request->query('orderDir', 'desc')
+            : 'desc';
+        $rawLimit = min(240, $limit + 20);
+        $excludedIds = array_values(array_filter(explode(',', (string) $request->query('exclude', ''))));
+
+        $rows = $query
+            ->orderBy($orderBy, $orderDir)
+            ->offset($offset)
+            ->limit($rawLimit)
+            ->get()
+            ->reject(fn (Video $video) => in_array((string) $video->id, $excludedIds, true))
+            ->values();
+
+        return response()->json([
+            'items' => $rows->take($limit)->map(fn (Video $video) => $this->mapVideoFull($video))->values(),
+            'count' => $rows->count(),
+            'hasMore' => $rows->count() === $rawLimit,
+            'page' => max(1, (int) $request->query('page', 1)),
+            'nextOffset' => $offset + $rows->count(),
+        ]);
+    }
+
+    public function categories(): JsonResponse
+    {
+        $categories = Category::query()
+            ->select([
+                'slug', 'label', 'short_label', 'description', 'about', 'accent_color',
+                'cover_image_url', 'icon', 'content_count', 'seo_title', 'seo_description',
+                'youtube_channel_id', 'youtube_channel_name', 'youtube_playlist_id',
+                'featured_publication_slug', 'spotlight_title', 'subscribe_title',
+                'subscribe_body', 'newsletter_title', 'newsletter_body',
+            ])
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json($categories);
+    }
+
+    public function searchSuggestions(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+        $limit = min(20, max(1, (int) $request->query('limit', 5)));
+
+        if ($query === '') {
+            return response()->json(['suggestions' => []]);
+        }
+
+        $suggestions = Video::query()
+            ->select('title')
+            ->where('status', 'published')
+            ->where('title', 'ilike', "%{$query}%")
+            ->orderByDesc('published_at')
+            ->limit($limit)
+            ->get()
+            ->pluck('title')
+            ->values();
+
+        return response()->json(['suggestions' => $suggestions]);
+    }
+
+    public function tags(Request $request): JsonResponse
+    {
+        $query = Tag::query();
+        if ($q = trim((string) $request->query('q', ''))) {
+            $query->where(fn ($builder) => $builder
+                ->where('label', 'ilike', "%{$q}%")
+                ->orWhere('slug', 'ilike', "%{$q}%")
+            );
+        }
+
+        return response()->json($query->orderByDesc('usage_count')->get([
+            'id',
+            'label',
+            'slug',
+            'usage_count',
+            'description',
+            'seo_title',
+            'seo_description',
+        ]));
+    }
+
+    public function tagBySlug(string $slug): JsonResponse
+    {
+        return response()->json(Tag::query()->where('slug', $slug)->firstOrFail());
+    }
+
+    public function relatedTags(string $tagId): JsonResponse
+    {
+        $contentIds = DB::table('content_tags')
+            ->where('tag_id', $tagId)
+            ->pluck('content_id');
+
+        if ($contentIds->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $related = DB::table('content_tags')
+            ->select('tag_id', DB::raw('count(*) as count'))
+            ->whereIn('content_id', $contentIds)
+            ->where('tag_id', '!=', $tagId)
+            ->groupBy('tag_id')
+            ->orderByDesc('count')
+            ->limit(6)
+            ->get();
+
+        if ($related->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $tags = Tag::query()
+            ->whereIn('id', $related->pluck('tag_id'))
+            ->get(['id', 'label', 'slug'])
+            ->keyBy('id');
+
+        return response()->json($related->map(fn ($row) => [
+            'label' => $tags[$row->tag_id]?->label ?? '',
+            'slug' => $tags[$row->tag_id]?->slug ?? '',
+            'count' => (int) $row->count,
+        ])->values());
+    }
+
+    public function authorBySlug(string $slug): JsonResponse
+    {
+        $author = AdminProfile::query()
+            ->select([
+                'id', 'display_name', 'username', 'bio', 'avatar_url', 'website_url', 'twitter_url',
+                'instagram_url', 'linkedin_url', 'location', 'author_slug', 'article_count', 'video_count',
+                'is_public', 'is_active',
+            ])
+            ->where('author_slug', $slug)
+            ->where('is_public', true)
+            ->where('is_active', true)
+            ->first();
+
+        return response()->json($author ? $this->mapAuthor($author) : null);
+    }
+
+    public function authorByName(string $name): JsonResponse
+    {
+        $author = AdminProfile::query()
+            ->select([
+                'id', 'display_name', 'username', 'bio', 'avatar_url', 'website_url', 'twitter_url',
+                'instagram_url', 'linkedin_url', 'location', 'author_slug', 'article_count', 'video_count',
+                'is_public', 'is_active',
+            ])
+            ->where('display_name', $name)
+            ->where('is_public', true)
+            ->where('is_active', true)
+            ->first();
+
+        return response()->json($author ? $this->mapAuthor($author) : null);
+    }
+
+    public function authorById(string $id): JsonResponse
+    {
+        $author = AdminProfile::query()
+            ->select([
+                'id', 'display_name', 'username', 'bio', 'avatar_url', 'website_url', 'twitter_url',
+                'instagram_url', 'linkedin_url', 'location', 'author_slug', 'article_count', 'video_count',
+                'is_public', 'is_active',
+            ])
+            ->where('id', $id)
+            ->where('is_public', true)
+            ->where('is_active', true)
+            ->first();
+
+        return response()->json($author ? $this->mapAuthor($author) : null);
+    }
+
+    private function applyPublicContentFilters($query, Request $request): void
+    {
+        if ($type = $request->query('content_type')) {
+            $types = array_values(array_filter(explode(',', (string) $type)));
+            if ($types !== []) {
+                $query->whereIn('content_type', $types);
+            }
+        }
+
+        if ($niche = $request->query('niche')) {
+            $niches = array_values(array_filter(explode(',', (string) $niche)));
+            if ($niches !== []) {
+                $query->whereIn('niche', $niches);
+            }
+        }
+
+        if ($slug = trim((string) $request->query('slug', ''))) {
+            $query->where('slug', $slug);
+        }
+
+        if ($sourceChannelSlug = trim((string) $request->query('source_channel_slug', ''))) {
+            $query->where('source_channel_slug', $sourceChannelSlug);
+        }
+
+        if ($tagSlug = trim((string) $request->query('tag_slug', ''))) {
+            $query->whereExists(fn ($builder) => $builder
+                ->from('content_tags')
+                ->join('tags', 'tags.id', '=', 'content_tags.tag_id')
+                ->whereColumn('content_tags.content_id', 'videos.id')
+                ->where('tags.slug', $tagSlug)
+            );
+        }
+
+        if ($tagId = trim((string) $request->query('tag_id', ''))) {
+            $query->whereExists(fn ($builder) => $builder
+                ->from('content_tags')
+                ->whereColumn('content_tags.content_id', 'videos.id')
+                ->where('content_tags.tag_id', $tagId)
+            );
+        }
+
+        if ($q = trim((string) $request->query('q', ''))) {
+            $query->where(fn ($builder) => $builder
+                ->where('title', 'ilike', "%{$q}%")
+                ->orWhere('description', 'ilike', "%{$q}%")
+                ->orWhere('author', 'ilike', "%{$q}%")
+                ->orWhere('body', 'ilike', "%{$q}%")
+            );
+        }
+
+        if ($authorId = trim((string) $request->query('author_id', ''))) {
+            $query->where('created_by', $authorId);
+        }
+
+        if ($author = trim((string) $request->query('author', ''))) {
+            $query->where('author', $author);
+        }
+
+        if ($ids = trim((string) $request->query('ids', ''))) {
+            $query->whereIn('id', array_values(array_filter(explode(',', $ids))));
+        }
+
+        if ($featured = $request->query('featured')) {
+            $query->where('is_featured', filter_var($featured, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        if ($breaking = $request->query('breaking')) {
+            $query->where('is_breaking', filter_var($breaking, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        if ($gte = trim((string) $request->query('gte', ''))) {
+            $query->where('published_at', '>=', $gte);
+        }
+    }
+
+    private function publicContentOrderBy(string $orderBy): string
+    {
+        return match ($orderBy) {
+            'views', 'title', 'created_at' => $orderBy,
+            default => 'published_at',
+        };
+    }
+
+    private function mapAuthor(AdminProfile $author): array
+    {
+        return [
+            'id' => $author->id,
+            'displayName' => $author->display_name,
+            'username' => $author->username,
+            'bio' => $author->bio,
+            'avatarUrl' => $author->avatar_url,
+            'websiteUrl' => $author->website_url,
+            'twitterUrl' => $author->twitter_url,
+            'instagramUrl' => $author->instagram_url,
+            'linkedinUrl' => $author->linkedin_url,
+            'location' => $author->location,
+            'authorSlug' => $author->author_slug,
+            'articleCount' => (int) ($author->article_count ?? 0),
+            'videoCount' => (int) ($author->video_count ?? 0),
+            'isPublic' => (bool) $author->is_public,
+        ];
+    }
+
+    private function mapVideoFull(Video $video): array
+    {
+        return [
+            'id' => $video->id,
+            'slug' => $video->slug,
+            'title' => $video->title,
+            'description' => $video->description ?? '',
+            'body' => $video->body ?? '',
+            'youtube_id' => $video->youtube_id ?? '',
+            'thumbnail_url' => $video->thumbnail_url ?? '',
+            'featured_image_url' => $video->featured_image_url ?? null,
+            'niche' => $video->niche,
+            'tags' => $video->tags ?? [],
+            'author' => $video->author ?? '',
+            'author_slug' => Str::slug((string) ($video->author ?? '')),
+            'source_channel_id' => $video->source_channel_id,
+            'source_channel_name' => $video->source_channel_name,
+            'source_channel_slug' => $video->source_channel_slug,
+            'created_by' => $video->created_by,
+            'collaborator_ids' => $video->collaborator_ids ?? [],
+            'published_at' => $video->published_at?->toISOString() ?? '',
+            'duration' => $video->duration ?? '',
+            'views' => (int) ($video->views ?? 0),
+            'is_featured' => (bool) ($video->is_featured ?? false),
+            'is_breaking' => (bool) ($video->is_breaking ?? false),
+            'seo_title' => $video->seo_title,
+            'seo_description' => $video->seo_description,
+            'seo_keywords' => $video->seo_keywords ?? [],
+            'og_image_url' => $video->og_image_url,
+            'content_type' => $video->content_type ?? 'video',
+            'word_count' => (int) ($video->word_count ?? 0),
+            'read_time' => (int) ($video->read_time ?? 0),
+            'status' => $video->status ?? 'published',
+            'key_takeaways' => $video->key_takeaways ?? [],
+        ];
+    }
+
+    private function mapVideoPreview(Video $video): array
+    {
+        $thumbnailUrl = $video->content_type === 'article'
+            ? ($video->featured_image_url ?: $video->thumbnail_url ?: '')
+            : ($video->thumbnail_url ?: $video->featured_image_url ?: '');
+
+        return [
+            'id' => $video->id,
+            'slug' => $video->slug,
+            'title' => $video->title,
+            'description' => $video->description ?? '',
+            'body' => '',
+            'youtubeId' => $video->youtube_id ?? '',
+            'thumbnailUrl' => $thumbnailUrl,
+            'category' => $video->niche,
+            'niche' => $video->niche,
+            'tags' => $video->tags ?? [],
+            'author' => $video->author ?? '',
+            'authorSlug' => Str::slug((string) $video->author),
+            'publishedAt' => optional($video->published_at)->toISOString() ?? '',
+            'duration' => $video->duration ?? '',
+            'views' => (int) ($video->views ?? 0),
+            'isFeatured' => false,
+            'isBreaking' => false,
+            'contentType' => $video->content_type ?? 'video',
+            'featuredImageUrl' => $video->featured_image_url ?? null,
+            'wordCount' => (int) ($video->word_count ?? 0),
+            'readTime' => (int) ($video->read_time ?? 0),
+            'status' => 'published',
+        ];
+    }
+
+    private function mapShort(Video $video): array
+    {
+        $item = $this->mapVideoPreview($video);
+        $item['thumbnailUrl'] = $video->thumbnail_url ?: $video->featured_image_url ?: '';
+        $item['contentType'] = 'short';
+
+        return $item;
+    }
+
+    private function resolvePrimaryImage(Video $video): string
+    {
+        return $video->content_type === 'article'
+            ? ($video->featured_image_url ?: $video->thumbnail_url ?: '')
+            : ($video->thumbnail_url ?: $video->featured_image_url ?: '');
+    }
+
+    // ─── Recommendations ─────────────────────────────────────
+
+    public function relatedContent(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'content_id' => ['required', 'uuid', 'exists:videos,id'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        $svc = app(RecommendationService::class);
+        $results = $svc->getRelated($data['content_id'], (int) ($data['limit'] ?? 6));
+
+        return response()->json(['items' => $results]);
+    }
+
+    public function trending(Request $request): JsonResponse
+    {
+        $limit = min(20, max(1, (int) $request->query('limit', 10)));
+        $svc = app(RecommendationService::class);
+        return response()->json(['items' => $svc->getTrending($limit)]);
+    }
+
+    public function recommendationsForUser(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            $svc = app(RecommendationService::class);
+            return response()->json(['items' => $svc->getTrending(10)]);
+        }
+        $svc = app(RecommendationService::class);
+        return response()->json(['items' => $svc->getForUser($user->id, 10)]);
+    }
+
+    public function clips(Request $request): JsonResponse
+    {
+        $limit = min(100, max(1, (int) $request->query('limit', 30)));
+        $platform = $request->query('platform');
+
+        $query = \App\Models\SocialClip::query()
+            ->with('linkedVideo:id,title,slug,niche,thumbnail_url')
+            ->orderByDesc('fetched_at')
+            ->limit($limit);
+
+        if ($platform && in_array($platform, ['youtube', 'facebook', 'tiktok'])) {
+            $query->where('platform', $platform);
+        }
+
+        $clips = $query->get()->map(function ($clip) {
+            return [
+                'id' => $clip->id,
+                'platform' => $clip->platform,
+                'title' => $clip->title,
+                'caption' => $clip->caption,
+                'thumbnail_url' => $clip->thumbnail_url,
+                'clip_url' => $clip->clip_url,
+                'embed_url' => $clip->embed_url,
+                'duration_seconds' => $clip->duration_seconds,
+                'published_at' => $clip->published_at?->toIso8601String(),
+                'linked_video' => $clip->linkedVideo ? [
+                    'id' => $clip->linkedVideo->id,
+                    'title' => $clip->linkedVideo->title,
+                    'slug' => $clip->linkedVideo->slug,
+                    'niche' => $clip->linkedVideo->niche,
+                    'thumbnail_url' => $clip->linkedVideo->thumbnail_url,
+                ] : null,
+                'mapping_status' => $clip->mapping_status,
+            ];
+        });
+
+        return response()->json(['data' => $clips]);
+    }
+
+    public function clipById(string $id): JsonResponse
+    {
+        $clip = \App\Models\SocialClip::with('linkedVideo:id,title,slug,niche,thumbnail_url')->findOrFail($id);
+
+        return response()->json([
+            'id' => $clip->id,
+            'platform' => $clip->platform,
+            'title' => $clip->title,
+            'caption' => $clip->caption,
+            'thumbnail_url' => $clip->thumbnail_url,
+            'clip_url' => $clip->clip_url,
+            'embed_url' => $clip->embed_url,
+            'duration_seconds' => $clip->duration_seconds,
+            'published_at' => $clip->published_at?->toIso8601String(),
+            'platform_metadata' => $clip->platform_metadata,
+            'linked_video' => $clip->linkedVideo ? [
+                'id' => $clip->linkedVideo->id,
+                'title' => $clip->linkedVideo->title,
+                'slug' => $clip->linkedVideo->slug,
+                'niche' => $clip->linkedVideo->niche,
+                'thumbnail_url' => $clip->linkedVideo->thumbnail_url,
+            ] : null,
+            'mapping_status' => $clip->mapping_status,
+        ]);
+    }
 }
