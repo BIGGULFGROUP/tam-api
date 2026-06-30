@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminProfile;
-use App\Models\NewsletterSubscriber;
 use App\Models\UserNotificationPreference;
 use App\Models\UserNotificationRead;
 use App\Models\UserReadEvent;
@@ -46,15 +45,7 @@ class AccountController extends Controller
             ->limit($limit);
 
         if ($prefs->subscribed_niches_only !== false && $admin->email) {
-            $subscriber = NewsletterSubscriber::query()
-                ->where('email', Str::lower($admin->email))
-                ->where('is_active', true)
-                ->first(['niches']);
-
-            $niches = is_array($subscriber?->niches) ? array_values(array_filter($subscriber->niches)) : [];
-            if ($niches !== []) {
-                $query->whereIn('niche', $niches);
-            }
+            // Newsletter subscribers removed — skip niche filtering
         }
 
         $items = $query->get();
