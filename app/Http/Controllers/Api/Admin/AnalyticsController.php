@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Comment;
 use App\Models\PageView;
 use App\Models\UserReadEvent;
 use App\Models\Video;
@@ -23,45 +22,6 @@ class AnalyticsController extends Controller
         $totalViews = $videos->sum('views');
         $published  = $videos->where('status', 'published')->count();
         $drafts     = $videos->where('status', 'draft')->count();
-
-        $subscribers = NewsletterSubscriber::where('is_active', true)->count();
-        $comments    = Comment::count();
-
-        $popupEvents = NewsletterPopupEvent::where('created_at', '>=', $since)
-            ->get(['event_type', 'template_key', 'category_slug']);
-
-        $popupOverview = ['impressions' => 0, 'closes' => 0, 'submits' => 0];
-        $templateMap   = [];
-        $categoryMap   = [];
-
-        foreach ($popupEvents as $e) {
-            $et = $e->event_type;
-            if ($et === 'impression') $popupOverview['impressions']++;
-            if ($et === 'close')      $popupOverview['closes']++;
-            if ($et === 'submit')     $popupOverview['submits']++;
-
-            $tk = $e->template_key ?? 'unknown';
-            $templateMap[$tk] ??= ['key' => $tk, 'name' => $tk, 'impressions' => 0, 'closes' => 0, 'submits' => 0];
-            if ($et === 'impression') $templateMap[$tk]['impressions']++;
-            if ($et === 'close')      $templateMap[$tk]['closes']++;
-            if ($et === 'submit')     $templateMap[$tk]['submits']++;
-
-            $cat = $e->category_slug ?? 'global';
-            $categoryMap[$cat] ??= ['category' => $cat, 'impressions' => 0, 'closes' => 0, 'submits' => 0];
-            if ($et === 'impression') $categoryMap[$cat]['impressions']++;
-            if ($et === 'close')      $categoryMap[$cat]['closes']++;
-            if ($et === 'submit')     $categoryMap[$cat]['submits']++;
-        }
-
-        $convRate = fn ($s, $i) => $i ? round($s / $i * 100, 2) : 0;
-
-        $templatePerf = collect($templateMap)
-            ->map(fn ($t) => array_merge($t, ['conversionRate' => $convRate($t['submits'], $t['impressions'])]))
-            ->sortByDesc('submits')->take(8)->values();
-
-        $byCategory = collect($categoryMap)
-            ->map(fn ($c) => array_merge($c, ['conversionRate' => $convRate($c['submits'], $c['impressions'])]))
-            ->sortByDesc('submits')->take(8)->values();
 
         $countryConfig = config('countries');
         $countryRows = UserReadEvent::query()
@@ -151,8 +111,6 @@ class AnalyticsController extends Controller
                 'totalPosts'     => $videos->count(),
                 'publishedPosts' => $published,
                 'draftPosts'     => $drafts,
-                'subscribers'    => $subscribers,
-                'comments'       => $comments,
                 'pageViews'      => $totalPageViews,
             ],
             'countries' => $countries,
@@ -172,12 +130,7 @@ class AnalyticsController extends Controller
                 'devices'  => $deviceData,
                 'sources'  => $sourceData,
             ],
-            'youtube' => $youtube,($popupOverview, [
-                'days'                => $days,
-                'conversionRate'      => $convRate($popupOverview['submits'], $popupOverview['impressions']),
-                'templatePerformance' => $templatePerf,
-                'byCategory'          => $byCategory,
-            ]),
+            'youtube' => $youtube,
         ]);
     }
 
