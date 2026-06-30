@@ -24,6 +24,9 @@ class AdminProfile extends Authenticatable
     protected $fillable = [
         'email',
         'password',
+        'email_verified_at',
+        'email_verification_token',
+        'email_verification_sent_at',
         'display_name',
         'full_name',
         'username',
@@ -49,6 +52,7 @@ class AdminProfile extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_token',
     ];
 
     protected function casts(): array
@@ -60,9 +64,16 @@ class AdminProfile extends Authenticatable
             'can_access_frontend_panel' => 'boolean',
             'can_access_backend_panel' => 'boolean',
             'last_login' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'email_verification_sent_at' => 'datetime',
             'article_count' => 'integer',
             'video_count' => 'integer',
         ];
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 
     protected static function booted(): void

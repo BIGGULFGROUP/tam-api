@@ -126,6 +126,8 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
     Route::prefix($frontendPrefix)->group(function () {
         Route::prefix('auth')->group(function () {
             Route::post('login', [AuthController::class, 'loginFrontend']);
+            Route::post('register', [AuthController::class, 'registerFrontend']);
+            Route::post('verify-email', [AuthController::class, 'verifyEmail']);
             Route::get('status', [AuthController::class, 'status']);
         });
 
@@ -134,6 +136,7 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
             Route::patch('auth/profile', [AuthController::class, 'updateProfile']);
             Route::patch('auth/password', [AuthController::class, 'updatePassword']);
             Route::post('auth/logout', [AuthController::class, 'logout']);
+            Route::post('auth/resend-verification', [AuthController::class, 'resendVerification']);
 
             Route::get('authors', [AdminProfileController::class, 'authors']);
             Route::post('authors/link-orphans', [AdminProfileController::class, 'linkOrphans']);

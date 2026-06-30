@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminProfile;
+use App\Services\BrevoService;
 use App\Support\AdminRoleRegistry;
+use App\Support\PublicUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -29,6 +32,107 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         return $this->loginForPanel($request, 'frontend');
+    }
+
+    /**
+     * POST /api/frontend-admin/auth/register
+     * Creates a reader AdminProfile and returns a Sanctum token, mirroring loginFrontend.
+     */
+    public function registerFrontend(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255', 'unique:admin_profiles,email'],
+            'password' => ['required', 'string', 'min:8'],
+            'full_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'display_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        $fullName = $data['full_name'] ?? null;
+        $displayName = $data['display_name'] ?? $fullName ?: Str::before($data['email'], '@');
+        $verificationToken = Str::random(48);
+
+        $admin = AdminProfile::create([
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'full_name' => $fullName,
+            'display_name' => $displayName,
+            'role' => 'reader',
+            'is_active' => true,
+            'is_public' => false,
+            'email_verification_token' => $verificationToken,
+            'email_verification_sent_at' => now(),
+        ]);
+
+        $this->sendVerificationEmail($admin, $verificationToken);
+
+        $token = $admin->createToken('frontend-admin-token', ['frontend:access'])->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user' => $this->profileData($admin),
+            'panel' => 'frontend',
+        ], 201);
+    }
+
+    /**
+     * POST /api/frontend-admin/auth/verify-email
+     * Public — consumes a verification token mailed at registration time.
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+        ]);
+
+        $admin = AdminProfile::where('email_verification_token', $data['token'])->first();
+
+        if (! $admin) {
+            return response()->json(['error' => 'Invalid or expired verification link.'], 404);
+        }
+
+        $admin->forceFill([
+            'email_verified_at' => now(),
+            'email_verification_token' => null,
+        ])->save();
+
+        return response()->json(['success' => true, 'message' => 'Email verified successfully.']);
+    }
+
+    /**
+     * POST /api/frontend-admin/auth/resend-verification
+     * Requires an authenticated (but possibly unverified) session.
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        /** @var AdminProfile $admin */
+        $admin = $request->user();
+
+        if ($admin->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Email is already verified.']);
+        }
+
+        $verificationToken = Str::random(48);
+        $admin->forceFill([
+            'email_verification_token' => $verificationToken,
+            'email_verification_sent_at' => now(),
+        ])->save();
+
+        $this->sendVerificationEmail($admin, $verificationToken);
+
+        return response()->json(['message' => 'Verification email sent.']);
+    }
+
+    private function sendVerificationEmail(AdminProfile $admin, string $token): void
+    {
+        app(BrevoService::class)->sendTransactional(
+            templateId: (int) config('services.brevo.template_email_verification', 4),
+            toEmail: $admin->email,
+            toName: $admin->display_name ?: $admin->email,
+            params: [
+                'FULL_NAME' => $admin->display_name,
+                'VERIFY_URL' => PublicUrl::to('/account/verify') . '?token=' . $token,
+            ]
+        );
     }
 
     /**
@@ -151,6 +255,7 @@ class AuthController extends Controller
         return [
             'id'           => $admin->id,
             'email'        => $admin->email,
+            'email_verified_at' => $admin->email_verified_at,
             'display_name' => $admin->display_name,
             'full_name'    => $admin->full_name,
             'username'     => $admin->username,

@@ -8,6 +8,24 @@ final class AdminRoleRegistry
     public const BACKEND_ADMIN = 'backend_admin';
 
     private const ROLE_MATRIX = [
+        'reader' => [
+            'tier' => self::FRONTEND_ADMIN,
+            'panels' => ['frontend' => true, 'backend' => false],
+            'permissions' => [
+                'manage_platform' => false,
+                'manage_users' => false,
+                'manage_roles' => false,
+                'manage_settings' => false,
+                'manage_content' => false,
+                'publish_content' => false,
+                'review_submissions' => false,
+                'moderate_content' => false,
+                'view_analytics' => false,
+                'view_logs' => false,
+                'upload_media' => false,
+                'delete_media' => false,
+            ],
+        ],
         'super_admin' => [
             'tier' => self::BACKEND_ADMIN,
             'panels' => ['frontend' => true, 'backend' => true],
@@ -231,7 +249,7 @@ final class AdminRoleRegistry
         $normalized = strtolower(trim((string) $role));
         $normalized = str_replace([' ', '-'], '_', $normalized);
 
-        return array_key_exists($normalized, self::ROLE_MATRIX) ? $normalized : 'analyst';
+        return array_key_exists($normalized, self::ROLE_MATRIX) ? $normalized : 'reader';
     }
 
     public static function allRoles(): array

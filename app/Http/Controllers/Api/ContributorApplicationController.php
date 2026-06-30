@@ -78,17 +78,33 @@ class ContributorApplicationController extends Controller
             ], 422);
         }
 
-        $password = Str::password(16);
+        // Upgrade the applicant's existing account (most applicants already have a
+        // reader AdminProfile from signing up before applying) instead of minting a
+        // second, unlinked login for the same email.
+        $existing = AdminProfile::where('email', $application->email)->first();
+        $isNewAccount = ! $existing;
+        $password = $isNewAccount ? Str::password(16) : null;
 
-        $profile = AdminProfile::create([
-            'email' => $application->email,
-            'password' => $password,
-            'display_name' => $application->full_name,
-            'full_name' => $application->full_name,
-            'role' => 'contributor',
-            'is_active' => true,
-            'is_public' => true,
-        ]);
+        if ($existing) {
+            $existing->update([
+                'display_name' => $existing->display_name ?: $application->full_name,
+                'full_name' => $existing->full_name ?: $application->full_name,
+                'role' => 'contributor',
+                'is_active' => true,
+                'is_public' => true,
+            ]);
+            $profile = $existing;
+        } else {
+            $profile = AdminProfile::create([
+                'email' => $application->email,
+                'password' => $password,
+                'display_name' => $application->full_name,
+                'full_name' => $application->full_name,
+                'role' => 'contributor',
+                'is_active' => true,
+                'is_public' => true,
+            ]);
+        }
 
         $application->update([
             'status' => 'approved',
@@ -105,8 +121,8 @@ class ContributorApplicationController extends Controller
             params: [
                 'FULL_NAME' => $application->full_name,
                 'EMAIL' => $application->email,
-                'PASSWORD' => $password,
-                'LOGIN_URL' => config('app.frontend_url', 'https://theafricanmail.com') . '/login',
+                'PASSWORD' => $password ?? '(use your existing password)',
+                'LOGIN_URL' => config('app.frontend_url', 'https://theafricanmail.com') . '/account/login',
             ]
         );
 

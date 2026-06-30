@@ -52,6 +52,8 @@ return [
         'template_daily_digest' => env('BREVO_TEMPLATE_DAILY_DIGEST', 1),
         'template_breaking_news' => env('BREVO_TEMPLATE_BREAKING_NEWS', 2),
         'template_weekly_roundup' => env('BREVO_TEMPLATE_WEEKLY_ROUNDUP', 3),
+        'template_email_verification' => env('BREVO_TEMPLATE_EMAIL_VERIFICATION', 4),
+        'template_contributor_approved' => env('BREVO_TEMPLATE_CONTRIBUTOR_APPROVED', 5),
     ],
 
     'webpush' => [
