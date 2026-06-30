@@ -44,7 +44,6 @@ class AnalyticsController extends Controller
                     'views'  => (int) $row->views,
                 ];
             })
-            ->filter(fn ($c) => isset($countryConfig[$c['code']]))
             ->values();
 
         // Page view stats
