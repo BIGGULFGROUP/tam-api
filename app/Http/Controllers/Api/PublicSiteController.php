@@ -233,4 +233,4 @@ class PublicSiteController extends Controller
             'message' => 'Comment submitted and awaiting moderation. Thank you!',
         ]);
     }
-
+}

@@ -193,4 +193,4 @@ class AccountController extends Controller
             'weeklyDigestEnabled' => $prefs->weekly_digest_enabled,
         ]);
     }
-
+}
