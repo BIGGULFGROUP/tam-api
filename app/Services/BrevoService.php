@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PublicUrl;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -122,13 +123,41 @@ class BrevoService
                     'NICHE' => $nicheLabel,
                     'DATE' => now()->format('F j, Y'),
                     'STORIES' => $topStories,
-                    'UNSUBSCRIBE_URL' => url('/account/settings'),
+                    'UNSUBSCRIBE_URL' => PublicUrl::to('/account/settings'),
                 ]
             );
             if ($ok) $sent++;
         }
 
         Log::info("Brevo: daily digest sent", ['niche' => $nicheLabel, 'sent' => $sent, 'total' => count($subscribers)]);
+        return $sent;
+    }
+
+    /**
+     * Send a campaign to its targeted subscribers.
+     */
+    public function sendCampaign(array $stories, array $subscribers, string $title, string $body, ?string $bannerUrl = null): int
+    {
+        $sent = 0;
+
+        foreach ($subscribers as $subscriber) {
+            $ok = $this->sendTransactional(
+                templateId: (int) config('services.brevo.template_weekly_roundup', 3),
+                toEmail: $subscriber['email'],
+                toName: $subscriber['name'] ?? 'Reader',
+                params: [
+                    'TITLE' => $title,
+                    'BODY' => $body,
+                    'BANNER_URL' => $bannerUrl,
+                    'DATE' => now()->format('F j, Y'),
+                    'STORIES' => $stories,
+                    'UNSUBSCRIBE_URL' => PublicUrl::to('/account/settings'),
+                ]
+            );
+            if ($ok) $sent++;
+        }
+
+        Log::info('Brevo: campaign sent', ['title' => $title, 'sent' => $sent, 'total' => count($subscribers)]);
         return $sent;
     }
 
@@ -149,10 +178,10 @@ class BrevoService
                     'BODY' => $content['body'] ?? '',
                     'NICHE' => $content['niche'] ?? '',
                     'READ_URL' => ($content['niche'] ?? '') && ($content['slug'] ?? '')
-                        ? url("/{$content['niche']}/{$content['slug']}")
-                        : url('/'),
+                        ? PublicUrl::to("/{$content['niche']}/{$content['slug']}")
+                        : PublicUrl::to('/'),
                     'DATE' => now()->format('F j, Y g:i A'),
-                    'UNSUBSCRIBE_URL' => url('/account/settings'),
+                    'UNSUBSCRIBE_URL' => PublicUrl::to('/account/settings'),
                 ]
             );
             if ($ok) $sent++;

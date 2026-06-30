@@ -40,6 +40,11 @@ return [
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
     ],
 
+    // The public-facing website's URL — used to build links inside outbound
+    // emails (App\Support\PublicUrl). Deliberately separate from APP_URL,
+    // which is this API's own domain and must never appear in an email link.
+    'frontend_public_url' => env('FRONTEND_PUBLIC_URL'),
+
     'brevo' => [
         'api_key' => env('BREVO_API_KEY'),
         'sender_email' => env('BREVO_SENDER_EMAIL', 'noreply@theafricanmail.com'),

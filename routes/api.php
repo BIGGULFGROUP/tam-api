@@ -18,8 +18,12 @@ use App\Http\Controllers\Api\Admin\SponsoredContentController;
 use App\Http\Controllers\Api\Admin\AffiliateLinkController;
 use App\Http\Controllers\Api\Admin\PushNotificationController;
 use App\Http\Controllers\Api\Admin\SocialClipController;
+use App\Http\Controllers\Api\Admin\NewsletterCampaignController;
+use App\Http\Controllers\Api\Admin\NewsletterPopupController;
+use App\Http\Controllers\Api\Admin\NewsletterSubscriberController;
 use App\Http\Controllers\Api\ContributorApplicationController;
 use App\Http\Controllers\Api\PublicSiteController;
+use App\Http\Controllers\Api\PublicNewsletterController;
 use App\Http\Controllers\Api\CommentController as PublicCommentController;
 use App\Http\Controllers\Api\PublicUserController;
 
@@ -56,7 +60,12 @@ Route::prefix('public')->group(function () {
     // Web push subscription
     Route::middleware('throttle:newsletter')->group(function () {
         Route::post('push/subscribe', [PublicUserController::class, 'subscribeWebPush']);
+        Route::post('newsletter', [PublicNewsletterController::class, 'subscribe']);
+        Route::post('newsletter/popup-event', [PublicNewsletterController::class, 'popupEvent']);
     });
+
+    Route::get('newsletters', [PublicNewsletterController::class, 'activeCampaigns']);
+    Route::get('newsletter/popup-config', [PublicNewsletterController::class, 'popupConfig']);
 
     // User profiles (public)
     Route::get('profile/{username}', [PublicUserController::class, 'profile']);
@@ -185,6 +194,7 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
                 Route::post('activity/read', [AccountController::class, 'recordActivityRead']);
                 Route::get('readership/weekly', [AccountController::class, 'weeklyReadership']);
                 Route::match(['get', 'put'], 'preferences/notifications', [AccountController::class, 'notificationPreferences']);
+                Route::match(['get', 'put'], 'preferences/newsletter', [PublicNewsletterController::class, 'preferences']);
                 Route::post('profile/avatar', [AccountController::class, 'updateAvatar']);
             });
         });
@@ -249,6 +259,19 @@ $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
             // YouTube Shorts extended
             Route::post('youtube/shorts/auto-link', [YoutubeController::class, 'autoLinkShorts']);
             Route::post('youtube/shorts/sync-clips', [YoutubeController::class, 'syncShortsAsClips']);
+
+            // Newsletter management
+            Route::get('newsletters', [NewsletterCampaignController::class, 'index']);
+            Route::post('newsletters', [NewsletterCampaignController::class, 'store']);
+            Route::patch('newsletters', [NewsletterCampaignController::class, 'update']);
+            Route::delete('newsletters', [NewsletterCampaignController::class, 'destroy']);
+
+            Route::get('newsletter/popups', [NewsletterPopupController::class, 'index']);
+            Route::post('newsletter/popups', [NewsletterPopupController::class, 'store']);
+            Route::delete('newsletter/popups', [NewsletterPopupController::class, 'destroy']);
+
+            Route::get('subscribers', [NewsletterSubscriberController::class, 'index']);
+            Route::get('subscribers/export', [NewsletterSubscriberController::class, 'export']);
         });
     });
 });

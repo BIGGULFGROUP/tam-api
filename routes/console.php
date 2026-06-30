@@ -10,3 +10,8 @@ Artisan::command('inspire', function () {
 
 // YouTube autofetch — run every 15 minutes
 Schedule::command('tam:youtube-autofetch')->everyFifteenMinutes()->withoutOverlapping();
+
+// Newsletter — daily digest, hourly campaign check, breaking news every 5 minutes
+Schedule::command('newsletter:send-digest')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('newsletter:send-campaigns')->hourly()->withoutOverlapping();
+Schedule::command('newsletter:send-breaking')->everyFiveMinutes()->withoutOverlapping();
