@@ -47,7 +47,7 @@ return [
 
     'brevo' => [
         'api_key' => env('BREVO_API_KEY'),
-        'sender_email' => env('BREVO_SENDER_EMAIL', 'noreply@theafricanmail.com'),
+        'sender_email' => env('BREVO_SENDER_EMAIL', 'hello@theafricanmail.com'),
         'sender_name' => env('BREVO_SENDER_NAME', 'The African Mail'),
         'template_daily_digest' => env('BREVO_TEMPLATE_DAILY_DIGEST', 1),
         'template_breaking_news' => env('BREVO_TEMPLATE_BREAKING_NEWS', 2),

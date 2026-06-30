@@ -16,7 +16,7 @@ class BrevoService
     public function __construct()
     {
         $this->apiKey = config('services.brevo.api_key', '');
-        $this->defaultSender = config('services.brevo.sender_email', 'noreply@theafricanmail.com');
+        $this->defaultSender = config('services.brevo.sender_email', 'hello@theafricanmail.com');
         $this->defaultSenderName = config('services.brevo.sender_name', 'The African Mail');
     }
 
