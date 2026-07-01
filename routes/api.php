@@ -125,7 +125,7 @@ $registerDomainGroup = function (?string $domain, callable $callback): void {
 $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
     Route::prefix($frontendPrefix)->group(function () {
         Route::prefix('auth')->group(function () {
-            Route::post('login', [AuthController::class, 'loginFrontend']);
+            Route::middleware('throttle:login')->post('login', [AuthController::class, 'loginFrontend']);
             Route::post('register', [AuthController::class, 'registerFrontend']);
             Route::post('verify-email', [AuthController::class, 'verifyEmail']);
             Route::get('status', [AuthController::class, 'status']);
@@ -207,7 +207,7 @@ $registerDomainGroup($frontendDomain, function () use ($frontendPrefix) {
 $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
     Route::prefix($backendPrefix)->group(function () {
         Route::prefix('auth')->group(function () {
-            Route::post('login', [AuthController::class, 'loginBackend']);
+            Route::middleware('throttle:login')->post('login', [AuthController::class, 'loginBackend']);
         });
 
         Route::middleware(['auth:sanctum', 'admin.panel:backend'])->group(function () {
