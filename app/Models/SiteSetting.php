@@ -24,6 +24,14 @@ class SiteSetting extends Model
         'shorts_autofetch_interval_hours', 'max_shorts_per_channel',
         'auto_publish_fetched',
         'permalink_structure', 'ad_placements',
+        // Mobile app
+        'app_store_url', 'play_store_url',
+        // Email
+        'welcome_email_enabled', 'welcome_email_subject', 'welcome_email_body_extra',
+        // AdMob
+        'admob_app_id_android', 'admob_app_id_ios',
+        'admob_interstitial_id_android', 'admob_interstitial_id_ios',
+        'admob_ad_frequency',
     ];
 
     protected function casts(): array
@@ -37,12 +45,14 @@ class SiteSetting extends Model
             'newsletter_popup_enabled'         => 'boolean',
             'shorts_autofetch_enabled'         => 'boolean',
             'auto_publish_fetched'             => 'boolean',
+            'welcome_email_enabled'            => 'boolean',
             'newsletter_popup_categories'      => 'array',
             'ad_placements'                    => 'array',
             'autosave_interval'                => 'integer',
             'newsletter_popup_interval_hours'  => 'integer',
             'shorts_autofetch_interval_hours'  => 'integer',
             'max_shorts_per_channel'           => 'integer',
+            'admob_ad_frequency'               => 'integer',
         ];
     }
 }

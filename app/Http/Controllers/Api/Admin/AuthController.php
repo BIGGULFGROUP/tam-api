@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WelcomeEmail;
 use App\Models\AdminProfile;
+use App\Models\SiteSetting;
 use App\Services\BrevoService;
+use Illuminate\Support\Facades\Mail;
 use App\Support\AdminRoleRegistry;
 use App\Support\PublicUrl;
 use Illuminate\Http\JsonResponse;
@@ -94,6 +97,18 @@ class AuthController extends Controller
             'email_verified_at' => now(),
             'email_verification_token' => null,
         ])->save();
+
+        $settings = SiteSetting::firstOrNew(['id' => 1]);
+        if ($settings->welcome_email_enabled ?? true) {
+            try {
+                Mail::to($admin->email)->send(new WelcomeEmail(
+                    displayName: $admin->display_name ?: $admin->full_name ?: 'there',
+                    settings: $settings,
+                ));
+            } catch (\Throwable) {
+                // Don't fail verification if welcome email fails
+            }
+        }
 
         return response()->json(['success' => true, 'message' => 'Email verified successfully.']);
     }

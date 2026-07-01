@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WelcomeEmail;
 use App\Models\SiteSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 class SiteSettingController extends Controller
@@ -35,7 +37,31 @@ class SiteSettingController extends Controller
         // YouTube Shorts extended
         'youtube_shorts_fetch_enabled', 'youtube_shorts_auto_link',
         'youtube_match_confidence_threshold',
+        // Mobile app store links
+        'app_store_url', 'play_store_url',
+        // Email
+        'welcome_email_enabled', 'welcome_email_subject', 'welcome_email_body_extra',
+        // AdMob
+        'admob_app_id_android', 'admob_app_id_ios',
+        'admob_interstitial_id_android', 'admob_interstitial_id_ios',
+        'admob_ad_frequency',
     ];
+
+    public function sendTestWelcomeEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $settings = SiteSetting::firstOrNew(['id' => 1]);
+
+        Mail::to($data['email'])->send(new WelcomeEmail(
+            displayName: 'Test User',
+            settings: $settings,
+        ));
+
+        return response()->json(['message' => 'Test welcome email sent to ' . $data['email']]);
+    }
 
     public function show(): JsonResponse
     {
@@ -75,6 +101,16 @@ class SiteSettingController extends Controller
             'auto_publish_fetched' => ['sometimes', 'boolean'],
             'permalink_structure' => ['sometimes', 'in:plain,type-slug,type-date-slug'],
             'ad_placements' => ['sometimes', 'nullable', 'array'],
+            'app_store_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
+            'play_store_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
+            'welcome_email_enabled' => ['sometimes', 'boolean'],
+            'welcome_email_subject' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'welcome_email_body_extra' => ['sometimes', 'nullable', 'string'],
+            'admob_app_id_android' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'admob_app_id_ios' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'admob_interstitial_id_android' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'admob_interstitial_id_ios' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'admob_ad_frequency' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20'],
         ]);
 
         // Filter to only columns that actually exist (defensive: migrations may be pending)

@@ -226,6 +226,7 @@ $registerDomainGroup($backendDomain, function () use ($backendPrefix) {
 
             Route::get('settings', [SiteSettingController::class, 'show']);
             Route::post('settings', [SiteSettingController::class, 'upsert']);
+            Route::post('settings/test-welcome-email', [SiteSettingController::class, 'sendTestWelcomeEmail']);
 
             Route::get('analytics', [AnalyticsController::class, 'index']);
             Route::get('activity-log', [ActivityLogController::class, 'index']);
